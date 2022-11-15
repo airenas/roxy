@@ -12,8 +12,14 @@ help:
 #####################################################################################
 ## start all containers
 start: 
-	docker compose up $(async) db
+	docker compose up $(async) db migrate
 .PHONY: start
+psql/roxy:
+	docker compose exec -e PGPASSWORD=$(PSQL_PASS) db psql -U roxy -h localhost -d asr
+.PHONY: psql/roxy
+psql/postgres:
+	docker compose exec -e PGPASSWORD=$(PSQL_PASS) db psql -U postgres -h localhost -d asr
+.PHONY: psql/postgres
 ## invoke integration tests
 # test/integration: start 
 # 	docker-compose up --build --exit-code-from integration-tests integration-tests
