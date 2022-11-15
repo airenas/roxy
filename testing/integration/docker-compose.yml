@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15.1-alpine3.16
+    restart: on-failure
+    volumes:
+    #   - db-data:/var/lib/postgresql/data
+    - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_PASSWORD=${PSQL_PASS}
+      - POSTGRES_INITDB_ARGS=--auth=password
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # db-migrate:
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
