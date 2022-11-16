@@ -20,7 +20,7 @@ services:
 
   migrate:
     image: airenas/roxy-dbmigrate:${migrate_version}
-    command: ["-path", "/migrations", "-database",  "postgres://postgres:${PSQL_PASS}@db:5432/asr?sslmode=disable", "up"]
+    command: ["-path", "/migrations", "-database",  "postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable", "up"]
     depends_on:
       db:
         condition: service_healthy

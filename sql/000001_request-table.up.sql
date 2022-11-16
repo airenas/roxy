@@ -8,6 +8,4 @@ CREATE TABLE requests(
     updated timestamp default current_timestamp
 );
 
-GRANT ALL ON ALL TABLES IN SCHEMA public TO roxy;
-
 COMMIT;
