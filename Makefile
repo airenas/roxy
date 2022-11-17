@@ -7,6 +7,23 @@ help:
 		awk '{info=$$0; getline; print "  " $$0 ": " info;}' | column -t -s ':' 
 .PHONY: help
 #####################################################################################
+generate:
+	go install github.com/petergtz/pegomock/...@latest
+	go generate ./...
+	
+renew-async-api:
+	go get github.com/airenas/async-api@$$(cd ../async-api;git rev-parse HEAD)	
+#####################################################################################
+## call units tests
+test/unit: 
+	go test -v -race -count=1 ./...
+.PHONY: test/unit
+## run integration tests
+test/integration: 
+	cd testing/integration && ( $(MAKE) -j1 test/integration clean || ( $(MAKE) clean; exit 1; ))
+.PHONY: test/integration
+#####################################################################################
+#####################################################################################
 migrate/install: 
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 .PHONY: migrate/install
@@ -32,3 +49,10 @@ docker/%/push:
 docker/%/scan: 
 	cd build/$* && $(MAKE) dscan
 .PHONY: docker/*/scan
+#####################################################################################
+## cleans temporary data
+clean:
+	go mod tidy -compat=1.18
+	go clean
+.PHONY: clean
+#####################################################################################

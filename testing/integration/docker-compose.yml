@@ -10,8 +10,8 @@ services:
     environment:
       - POSTGRES_PASSWORD=${PSQL_PASS}
       - POSTGRES_INITDB_ARGS=--auth=password
-    expose:
-      - 5432
+    ports:
+      - 5433:5432
     healthcheck:
       test: [ "CMD", "pg_isready" ]
       interval: 10s
