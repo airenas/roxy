@@ -43,38 +43,16 @@ func main() {
 		goapp.Log.Fatal(fmt.Errorf("can't init file saver: %w", err))
 	}
 
-	// mongoSessionProvider, err := mng.NewSessionProvider(cfg.GetString("mongo.url"), mongo.GetIndexes(), "tts")
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init mongo session provider"))
-	// }
-	// defer mongoSessionProvider.Close()
-
-	// msgChannelProvider, err := rabbit.NewChannelProvider(cfg.GetString("messageServer.url"),
-	// 	cfg.GetString("messageServer.user"), cfg.GetString("messageServer.pass"))
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init rabbitmq channel provider"))
-	// }
-	// defer msgChannelProvider.Close()
-	// err = initQueues(msgChannelProvider)
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init queues"))
-	// }
-
-	// data.MsgSender = rabbit.NewSender(msgChannelProvider)
+	data.MsgSender, err = postgres.NewSender(dbPool)
+	if err != nil {
+		goapp.Log.Fatal(fmt.Errorf("can't init gue sender: %w", err))
+	}
 
 	err = upload.StartWebServer(data)
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't start web server: %w", err))
 	}
 }
-
-// func initQueues(prv *rabbit.ChannelProvider) error {
-// 	goapp.Log.Info("Initializing queues")
-// 	return prv.RunOnChannelWithRetry(func(ch *amqp.Channel) error {
-// 		_, err := rabbit.DeclareQueue(ch, prv.QueueName(messages.Upload))
-// 		return err
-// 	})
-// }
 
 var (
 	version = "DEV"

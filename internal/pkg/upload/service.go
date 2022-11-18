@@ -18,6 +18,7 @@ import (
 
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/api"
+	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/status"
 	"github.com/airenas/roxy/internal/pkg/utils"
@@ -36,7 +37,7 @@ type FileSaver interface {
 
 //MsgSender provides send msg functionality
 type MsgSender interface {
-	Send(msg amessages.Message, queue, replyQueue string) error
+	SendMessage(context.Context, amessages.Message, string) error
 }
 
 //DBSaver saves requests to DB
@@ -85,9 +86,9 @@ func validate(data *Data) error {
 	if data.DBSaver == nil {
 		return fmt.Errorf("no request saver")
 	}
-	// if data.MsgSender == nil {
-	// 	return errors.New("no msg sender")
-	// }
+	if data.MsgSender == nil {
+		return fmt.Errorf("no msg sender")
+	}
 	return nil
 }
 
@@ -125,6 +126,7 @@ type result struct {
 func upload(data *Data) func(echo.Context) error {
 	return func(c echo.Context) error {
 		defer goapp.Estimate("upload method")()
+		ctx := c.Request().Context()
 
 		form, err := c.MultipartForm()
 		if err != nil {
@@ -170,29 +172,28 @@ func upload(data *Data) func(echo.Context) error {
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Infof("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
-		err = data.DBSaver.SaveRequest(c.Request().Context(), &rd)
+		err = data.DBSaver.SaveRequest(ctx, &rd)
 		if err != nil {
 			goapp.Log.Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = data.DBSaver.SaveStatus(c.Request().Context(), &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
+		err = data.DBSaver.SaveStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
 			Created: time.Now(), AudioReady: audioReady})
 		if err != nil {
 			goapp.Log.Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = saveFiles(c.Request().Context(), data.Saver, rd.ID, files, fHeaders)
+		err = saveFiles(ctx, data.Saver, rd.ID, files, fHeaders)
 		if err != nil {
 			goapp.Log.Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 
-		// err = h.data.MessageSender.Send(messages.NewQueueMessage(id, recID, tags), msg, "")
-		// if err != nil {
-		// 	http.Error(w, "Can not send decode message", http.StatusInternalServerError)
-		// 	cmdapp.Log.Error(err)
-		// 	return
-		// }
+		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: rd.ID}}, messages.Upload)
+		if err != nil {
+			goapp.Log.Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
 
 		res := result{ID: rd.ID}
 		return c.JSON(http.StatusOK, res)

@@ -6,20 +6,24 @@ type (
 
 	//ReqData table
 	ReqData struct {
-		ID         string
-		FileCount  int
-		Filename   string
-		AudioReady bool
-		Created    time.Time
-		Email      string
-		Params     map[string]string
-		RequestID  string
+		ID        string
+		FileCount int
+		Filename  string
+		Created   time.Time
+		Email     string
+		Params    map[string]string
+		RequestID string
 	}
 
 	//Status information table
 	Status struct {
-		ID     string `bson:"ID"`
-		Status string `bson:"status,omitempty"`
-		Error  string `bson:"error,omitempty"`
+		ID               string
+		Status           string
+		Error            string
+		ErrorCode        string
+		AudioReady       bool
+		AvailableResults []string
+		Created          time.Time
+		Updated          time.Time
 	}
 )
