@@ -12,7 +12,7 @@ help:
 #####################################################################################
 ## start all containers
 start: 
-	docker compose up $(async) db migrate minio
+	docker compose up $(async) db migrate minio upload
 .PHONY: start
 psql/roxy:
 	docker compose exec -e PGPASSWORD=$(PSQL_PASS) db psql -U roxy -h localhost -d asr
@@ -20,14 +20,14 @@ psql/roxy:
 psql/postgres:
 	docker compose exec -e PGPASSWORD=$(PSQL_PASS) db psql -U postgres -h localhost -d asr
 .PHONY: psql/postgres
-## invoke integration tests
-# test/integration: start 
-# 	docker-compose up --build --exit-code-from integration-tests integration-tests
-# .PHONY: test/integration
-## invoke integration tests in verbose mode
-# test/integration/tmp:  
-# 	docker-compose up --build --exit-code-from integration-tests 
-# .PHONY: test/integration/tmp
+# invoke integration tests
+test/integration: start 
+	docker compose up --build --exit-code-from integration-tests integration-tests
+.PHONY: test/integration
+# invoke integration tests in verbose mode
+test/integration/tmp:  
+	docker compose up --build --exit-code-from integration-tests 
+.PHONY: test/integration/tmp
 ## clean everything, stops docker containers and removes them
 clean:
 	docker compose down 

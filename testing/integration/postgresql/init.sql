@@ -1,2 +1,2 @@
-CREATE USER roxy WITH ENCRYPTED PASSWORD 'thah0AeSequa7ieChaif3thua5ahhe';
+CREATE USER roxy WITH ENCRYPTED PASSWORD 'roxy-int-secret';
 CREATE DATABASE asr OWNER roxy;
