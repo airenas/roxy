@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/airenas/async-api/pkg/miniofs"
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/upload"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -22,7 +22,9 @@ func main() {
 	data.Port = cfg.GetInt("port")
 	var err error
 
-	dbPool, err := pgxpool.New(context.Background(), cfg.GetString("db.url"))
+	ctx := context.Background()
+
+	dbPool, err := pgxpool.New(ctx, cfg.GetString("db.url"))
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
 	}
@@ -32,29 +34,20 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't init db: %w", err))
 	}
-	
-	data.ReqSaver = db
-	// data.Configurator, err = upload.NewTTSConfigurator(cfg.GetString("synthesis.defaultFormat"),
-	// 	cfg.GetString("synthesis.defaultVoice"), cfg.GetStringSlice("synthesis.voices"))
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init configuration"))
-	// }
 
-	// data.Saver, err = file.NewLocalSaver(cfg.GetString("fileStorage.path"))
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init file saver"))
-	// }
+	data.ReqSaver = db
+
+	data.Saver, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
+		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})
+	if err != nil {
+		goapp.Log.Fatal(fmt.Errorf("can't init file saver: %w", err))
+	}
 
 	// mongoSessionProvider, err := mng.NewSessionProvider(cfg.GetString("mongo.url"), mongo.GetIndexes(), "tts")
 	// if err != nil {
 	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init mongo session provider"))
 	// }
 	// defer mongoSessionProvider.Close()
-
-	// data.ReqSaver, err = mongo.NewRequest(mongoSessionProvider)
-	// if err != nil {
-	// 	goapp.Log.Fatal(errors.Wrap(err, "can't init mongo request saver"))
-	// }
 
 	// msgChannelProvider, err := rabbit.NewChannelProvider(cfg.GetString("messageServer.url"),
 	// 	cfg.GetString("messageServer.user"), cfg.GetString("messageServer.pass"))
@@ -71,7 +64,7 @@ func main() {
 
 	err = upload.StartWebServer(data)
 	if err != nil {
-		goapp.Log.Fatal(errors.Wrap(err, "can't start web server"))
+		goapp.Log.Fatal(fmt.Errorf("can't start web server: %w", err))
 	}
 }
 

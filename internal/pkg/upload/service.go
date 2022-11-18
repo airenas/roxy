@@ -30,7 +30,7 @@ import (
 
 //FileSaver provides save file functionality
 type FileSaver interface {
-	Save(name string, r io.Reader) error
+	SaveFile(ctx context.Context, name string, r io.Reader) error
 }
 
 //MsgSender provides send msg functionality
@@ -56,7 +56,7 @@ const requestIDHEader = "x-doorman-requestid"
 
 //StartWebServer starts echo web service
 func StartWebServer(data *Data) error {
-	goapp.Log.Infof("Starting HTTP BIG TTS Line service at %d", data.Port)
+	goapp.Log.Infof("Starting HTTP ROXY upload service at %d", data.Port)
 	if err := validate(data); err != nil {
 		return err
 	}
@@ -78,9 +78,9 @@ func StartWebServer(data *Data) error {
 }
 
 func validate(data *Data) error {
-	// if data.Saver == nil {
-	// 	return errors.New("no file saver")
-	// }
+	if data.Saver == nil {
+		return errors.New("no file saver")
+	}
 	if data.ReqSaver == nil {
 		return fmt.Errorf("no request saver")
 	}
@@ -190,7 +190,7 @@ func upload(data *Data) func(echo.Context) error {
 		// 	return
 		// }
 
-		err = saveFiles(data.Saver, rd.ID, files, fHeaders)
+		err = saveFiles(c.Request().Context(), data.Saver, rd.ID, files, fHeaders)
 		if err != nil {
 			goapp.Log.Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError)
@@ -320,11 +320,11 @@ func validateFiles(fHeaders []*multipart.FileHeader) error {
 	return nil
 }
 
-func saveFiles(fs FileSaver, id string, files []multipart.File, fHeaders []*multipart.FileHeader) error {
+func saveFiles(ctx context.Context, fs FileSaver, id string, files []multipart.File, fHeaders []*multipart.FileHeader) error {
 	if len(files) == 1 {
 		ext := filepath.Ext(fHeaders[0].Filename)
 		ext = strings.ToLower(ext)
-		return fs.Save(id+ext, files[0])
+		return fs.SaveFile(ctx, id+ext, files[0])
 	}
 
 	for i, f := range files {
@@ -333,7 +333,7 @@ func saveFiles(fs FileSaver, id string, files []multipart.File, fHeaders []*mult
 			return errors.New("no file name in multipart")
 		}
 		fn = filepath.Join(id, sanitizeName(fn))
-		err := fs.Save(toLowerExt(fn), f)
+		err := fs.SaveFile(ctx, toLowerExt(fn), f)
 		if err != nil {
 			return errors.Wrapf(err, "can't save %s", fn)
 		}
