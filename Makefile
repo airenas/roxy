@@ -10,7 +10,7 @@ help:
 generate:
 	go install github.com/petergtz/pegomock/...@latest
 	go generate ./...
-	
+
 renew-async-api:
 	go get github.com/airenas/async-api@$$(cd ../async-api;git rev-parse HEAD)	
 #####################################################################################
@@ -22,6 +22,12 @@ test/unit:
 test/integration: 
 	cd testing/integration && ( $(MAKE) -j1 test/integration clean || ( $(MAKE) clean; exit 1; ))
 .PHONY: test/integration
+## code vet and lint
+test/lint: 
+	go vet ./...
+	go install golang.org/x/lint/golint@latest
+	golint -set_exit_status ./...
+.PHONY: test/lint
 #####################################################################################
 #####################################################################################
 migrate/install: 
