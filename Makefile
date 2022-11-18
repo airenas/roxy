@@ -43,7 +43,7 @@ docker/%/build:
 .PHONY: docker/*/build
 #####################################################################################
 ## build all containers
-build/all: docker/dbmigrate/build
+build/all: docker/dbmigrate/build docker/upload/build
 .PHONY: build/all
 #####################################################################################
 ## push docker for provided service

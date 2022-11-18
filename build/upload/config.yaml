@@ -1,0 +1,10 @@
+port: 8000
+
+filer:
+    user: roxy
+    bucket: asr
+    # url: localhost:9000
+    # key: ---
+
+# db:
+    # url: postgres://roxy:---@localhost:5433/asr?sslmode=disable  
