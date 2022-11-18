@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/airenas/roxy/internal/pkg/postgres"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
@@ -92,4 +94,29 @@ func CheckCode(t *testing.T, resp *http.Response, expected int) {
 func Decode(t *testing.T, resp *http.Response, to interface{}) {
 	t.Helper()
 	require.Nil(t, json.NewDecoder(resp.Body).Decode(to))
+}
+
+func waitForDB(ctx context.Context, URL string) {
+	dbPool, err := pgxpool.New(ctx, URL)
+	if err != nil {
+		log.Fatalf("FAIL: can't init db pool")
+	}
+	defer dbPool.Close()
+
+	for {
+		log.Printf("check db live ...")
+		db, err := postgres.NewDB(dbPool)
+		if err == nil {
+			if err = db.Live(ctx); err == nil {
+				return
+			}
+			log.Printf(err.Error())
+		}
+		select {
+		case <-ctx.Done():
+			log.Fatalf("FAIL: can't access db")
+			break
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
 }

@@ -42,3 +42,15 @@ func (db *DB) SaveStatus(ctx context.Context, item *persistence.Status) error {
 	}
 	return nil
 }
+
+// Live returns no error if db is reachable and initialized
+func (db *DB) Live(ctx context.Context) error {
+	var exists bool
+	if err := db.pool.QueryRow(ctx, `SELECT EXISTS (SELECT FROM pg_tables WHERE tablename = 'status')`).Scan(&exists); err != nil {
+		return fmt.Errorf("can't check table: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("no migration done")
+	}
+	return nil
+}

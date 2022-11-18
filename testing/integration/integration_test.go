@@ -35,6 +35,7 @@ func TestMain(m *testing.M) {
 	defer cf()
 	WaitForOpenOrFail(tCtx, cfg.dbURL)
 	WaitForOpenOrFail(tCtx, cfg.uploadURL)
+	waitForDB(tCtx, cfg.dbURL)
 
 	os.Exit(m.Run())
 }
