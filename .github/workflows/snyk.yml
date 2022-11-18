@@ -1,0 +1,36 @@
+name: Snyk vulnerabilities Tests
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: [upload, dbmigrate]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build containers ${{ matrix.container }}
+        run: make docker/${{ matrix.container }}/build migrate_version=latest upload_version=latest
+
+      - name: Run Snyk to check ${{ matrix.container }} Docker image for vulnerabilities
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: airenas/roxy-${{ matrix.container }}:latest
+          args: --file=build/${{ matrix.container }}/Dockerfile
+
+      - name: Make sarif file copy
+        run: mv snyk.sarif snyk-${{ matrix.container }}.sarif
+
+      - name: Upload snyk ${{ matrix.container }} result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: snyk-${{ matrix.container }}.sarif
+          category: ${{ matrix.container }}-analysis
+          
