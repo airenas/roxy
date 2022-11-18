@@ -35,7 +35,7 @@ func main() {
 		goapp.Log.Fatal(fmt.Errorf("can't init db: %w", err))
 	}
 
-	data.ReqSaver = db
+	data.DBSaver = db
 
 	data.Saver, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
 		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})

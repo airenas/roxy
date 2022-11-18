@@ -7,7 +7,6 @@ CREATE TABLE requests(
     email TEXT,
     file_count INT DEFAULT 0,
     params JSONB,
-    audio_ready BOOL DEFAULT FALSE,
     request_id TEXT NOT NULL,
     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP

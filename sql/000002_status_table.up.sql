@@ -1,12 +1,16 @@
 --SQL statements for a request table
 BEGIN;
 
---Schema for requests table
 CREATE TABLE status(
-    id uuid not null,
+    id UUID NOT NULL PRIMARY KEY,
     status TEXT NOT NULL,
-    created timestamp default current_timestamp,
-    updated timestamp default current_timestamp
+    status_external TEXT,
+    error_code TEXT,
+    error TEXT,
+    audio_ready BOOL DEFAULT FALSE,
+    available_results JSONB,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMIT;

@@ -19,6 +19,7 @@ import (
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/api"
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/status"
 	"github.com/airenas/roxy/internal/pkg/utils"
 
 	"github.com/airenas/go-app/pkg/goapp"
@@ -38,17 +39,17 @@ type MsgSender interface {
 	Send(msg amessages.Message, queue, replyQueue string) error
 }
 
-//RequestSaver saves requests to DB
-type RequestSaver interface {
+//DBSaver saves requests to DB
+type DBSaver interface {
 	SaveRequest(ctx context.Context, req *persistence.ReqData) error
+	SaveStatus(ctx context.Context, req *persistence.Status) error
 }
 
 // Data keeps data required for service work
 type Data struct {
-	Port int
-	//Configurator *TTSConfigutaror
+	Port      int
 	Saver     FileSaver
-	ReqSaver  RequestSaver
+	DBSaver   DBSaver
 	MsgSender MsgSender
 }
 
@@ -81,7 +82,7 @@ func validate(data *Data) error {
 	if data.Saver == nil {
 		return errors.New("no file saver")
 	}
-	if data.ReqSaver == nil {
+	if data.DBSaver == nil {
 		return fmt.Errorf("no request saver")
 	}
 	// if data.MsgSender == nil {
@@ -159,37 +160,27 @@ func upload(data *Data) func(echo.Context) error {
 		rd.FileCount = len(files)
 		rd.Params = takeParams(form)
 		rd.Filename = rd.ID + ".mp3"
-		rd.AudioReady = false
+		audioReady := false
 		if len(files) == 1 {
 			ext := filepath.Ext(fHeaders[0].Filename)
 			ext = strings.ToLower(ext)
 			rd.Filename = rd.ID + ext
-			rd.AudioReady = true
+			audioReady = true
 		}
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Infof("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
-		err = data.ReqSaver.SaveRequest(c.Request().Context(), &rd)
+		err = data.DBSaver.SaveRequest(c.Request().Context(), &rd)
 		if err != nil {
 			goapp.Log.Error(err)
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-
-		// err = data.StSaver.Save()
-		// if err != nil {
-		// 	goapp.Log.Error(err)
-		// 	return echo.NewHTTPError(http.StatusInternalServerError)
-		// }
-
-		// err = h.data.StatusSaver.SaveF(id, map[string]interface{}{
-		// 	"status":                 status.Name(status.Uploaded),
-		// 	persistence.StAudioReady: audioReady}, nil)
-		// if err != nil {
-		// 	http.Error(w, "Can not save status", http.StatusInternalServerError)
-		// 	cmdapp.Log.Error(err)
-		// 	return
-		// }
-
+		err = data.DBSaver.SaveStatus(c.Request().Context(), &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
+			Created: time.Now(), AudioReady: audioReady})
+		if err != nil {
+			goapp.Log.Error(err)
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
 		err = saveFiles(c.Request().Context(), data.Saver, rd.ID, files, fHeaders)
 		if err != nil {
 			goapp.Log.Error(err)
