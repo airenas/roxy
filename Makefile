@@ -20,7 +20,7 @@ test/unit:
 .PHONY: test/unit
 ## run integration tests
 test/integration: 
-	cd testing/integration && ( $(MAKE) -j1 test/integration clean || ( $(MAKE) clean; exit 1; ))
+	cd testing/integration && ( $(MAKE) -j1 test/integration/ci clean || ( $(MAKE) clean; exit 1; ))
 .PHONY: test/integration
 ## code vet and lint
 test/lint: 
