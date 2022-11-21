@@ -28,8 +28,8 @@ test/integration: start
 test/integration/ci:  
 	( docker compose up & ); \
 	echo STARTED: compose; \
-	timeout 10s sh -c 'until ( docker ps | grep roxy-int-integration-tests-1 ) do echo wait...; sleep 1; done' \
-		|| ( echo no integration container & exit 1 ); \
+	timeout 60s sh -c 'until ( docker ps | grep roxy-int-integration-tests-1 ) do echo wait...; sleep 1; done' \
+		|| echo no integration container && exit 1; \
 	echo FOUND: docker container; \
 	res_p=`docker wait roxy-int-integration-tests-1`; \
 	echo RES: $${res_p}; \
