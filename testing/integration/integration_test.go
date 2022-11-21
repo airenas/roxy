@@ -29,7 +29,7 @@ var cfg config
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
-	cfg.httpclient = &http.Client{Timeout: time.Second * 20}
+	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
 
 	tCtx, cf := context.WithTimeout(context.Background(), time.Second*20)
 	defer cf()
