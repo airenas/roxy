@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
 	}
-	add_db_log(dbConfig)
+	addDBLog(dbConfig)
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
@@ -61,22 +61,22 @@ func main() {
 	}
 }
 
-func add_db_log(dbConfig *pgxpool.Config) {
-	log_f := goapp.Log.Info
+func addDBLog(dbConfig *pgxpool.Config) {
+	logFunc := goapp.Log.Info
 	dbConfig.BeforeConnect = func(ctx context.Context, cc *pgx.ConnConfig) error {
-		log_f("before connect")
+		logFunc("before connect")
 		return nil
 	}
 	dbConfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
-		log_f("after connect")
+		logFunc("after connect")
 		return nil
 	}
 	dbConfig.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
-		log_f("before acquire")
+		logFunc("before acquire")
 		return true
 	}
 	dbConfig.AfterRelease = func(c *pgx.Conn) bool {
-		log_f("after release")
+		logFunc("after release")
 		return true
 	}
 }
