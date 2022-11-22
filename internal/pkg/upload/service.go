@@ -84,7 +84,7 @@ func validate(data *Data) error {
 		return errors.New("no file saver")
 	}
 	if data.DBSaver == nil {
-		return fmt.Errorf("no request saver")
+		return fmt.Errorf("no db saver")
 	}
 	if data.MsgSender == nil {
 		return fmt.Errorf("no msg sender")
