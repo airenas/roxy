@@ -8,6 +8,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/upload"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
 )
@@ -24,7 +25,13 @@ func main() {
 
 	ctx := context.Background()
 
-	dbPool, err := pgxpool.New(ctx, cfg.GetString("db.url"))
+	dbConfig, err := pgxpool.ParseConfig(cfg.GetString("db.url"))
+	if err != nil {
+		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
+	}
+	add_db_log(dbConfig)
+
+	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
 	}
@@ -51,6 +58,26 @@ func main() {
 	err = upload.StartWebServer(data)
 	if err != nil {
 		goapp.Log.Fatal(fmt.Errorf("can't start web server: %w", err))
+	}
+}
+
+func add_db_log(dbConfig *pgxpool.Config) {
+	log_f := goapp.Log.Info
+	dbConfig.BeforeConnect = func(ctx context.Context, cc *pgx.ConnConfig) error {
+		log_f("before connect")
+		return nil
+	}
+	dbConfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		log_f("after connect")
+		return nil
+	}
+	dbConfig.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
+		log_f("before acquire")
+		return true
+	}
+	dbConfig.AfterRelease = func(c *pgx.Conn) bool {
+		log_f("after release")
+		return true
 	}
 }
 
