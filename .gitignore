@@ -13,3 +13,4 @@
 testing/integration/data
 cmd/upload/upload
 .vscode
+cmd/worker/worker
