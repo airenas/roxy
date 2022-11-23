@@ -9,7 +9,7 @@ import (
 
 //WriteFile write file to disk
 func WriteFile(name string, data []byte) error {
-	goapp.Log.Infof("Save %s", name)
+	goapp.Log.Info().Str("name", name).Msg("Save")
 	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err

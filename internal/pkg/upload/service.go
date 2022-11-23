@@ -58,7 +58,7 @@ const requestIDHEader = "x-doorman-requestid"
 
 //StartWebServer starts echo web service
 func StartWebServer(data *Data) error {
-	goapp.Log.Infof("Starting HTTP ROXY upload service at %d", data.Port)
+	goapp.Log.Info().Msgf("Starting HTTP ROXY upload service at %d", data.Port)
 	if err := validate(data); err != nil {
 		return err
 	}
@@ -72,9 +72,7 @@ func StartWebServer(data *Data) error {
 	e.Server.ReadTimeout = 60 * time.Second
 	e.Server.WriteTimeout = 30 * time.Second
 
-	w := goapp.Log.Writer()
-	defer w.Close()
-	gracehttp.SetLogger(log.New(w, "", 0))
+	gracehttp.SetLogger(log.New(goapp.Log, "", 0))
 
 	return gracehttp.Serve(e.Server)
 }
@@ -106,9 +104,9 @@ func initRoutes(data *Data) *echo.Echo {
 	e.POST("/upload", upload(data))
 	e.GET("/live", live(data))
 
-	goapp.Log.Info("Routes:")
+	goapp.Log.Info().Msg("Routes:")
 	for _, r := range e.Routes() {
-		goapp.Log.Infof("  %s %s", r.Method, r.Path)
+		goapp.Log.Info().Msgf("  %s %s", r.Method, r.Path)
 	}
 	return e
 }
@@ -170,28 +168,28 @@ func upload(data *Data) func(echo.Context) error {
 			audioReady = true
 		}
 		rd.RequestID = extractRequestID(c.Request().Header)
-		goapp.Log.Infof("RequestID=%s", goapp.Sanitize(rd.RequestID))
+		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
 		err = data.DBSaver.SaveRequest(ctx, &rd)
 		if err != nil {
-			goapp.Log.Error(err)
+			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 		err = data.DBSaver.SaveStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
 			Created: time.Now(), AudioReady: audioReady})
 		if err != nil {
-			goapp.Log.Error(err)
+			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 		err = saveFiles(ctx, data.Saver, rd.ID, files, fHeaders)
 		if err != nil {
-			goapp.Log.Error(err)
+			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 
 		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: rd.ID}}, messages.Upload)
 		if err != nil {
-			goapp.Log.Error(err)
+			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 

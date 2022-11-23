@@ -27,19 +27,19 @@ func main() {
 
 	dbConfig, err := pgxpool.ParseConfig(cfg.GetString("db.url"))
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
 	}
 	addDBLog(dbConfig)
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
 	}
 	defer dbPool.Close()
 
 	db, err := postgres.NewDB(dbPool)
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't init db: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't init db: %w", err))
 	}
 
 	data.DBSaver = db
@@ -47,22 +47,22 @@ func main() {
 	data.Saver, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
 		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't init file saver: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't init file saver: %w", err))
 	}
 
 	data.MsgSender, err = postgres.NewSender(dbPool)
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't init gue sender: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't init gue sender: %w", err))
 	}
 
 	err = upload.StartWebServer(data)
 	if err != nil {
-		goapp.Log.Fatal(fmt.Errorf("can't start web server: %w", err))
+		goapp.Log.Fatal().Err(fmt.Errorf("can't start web server: %w", err))
 	}
 }
 
 func addDBLog(dbConfig *pgxpool.Config) {
-	logFunc := goapp.Log.Info
+	logFunc := goapp.Log.Info().Msg
 	dbConfig.BeforeConnect = func(ctx context.Context, cc *pgx.ConnConfig) error {
 		logFunc("before connect")
 		return nil

@@ -28,7 +28,7 @@ func NewSender(pool *pgxpool.Pool) (*Sender, error) {
 
 //SendMessage sends the message with
 func (sender *Sender) SendMessage(ctx context.Context, msg messages.Message, queue string) error {
-	goapp.Log.Debugf("Sending message to %s", queue)
+	goapp.Log.Debug().Str("queue", queue).Msg("Sending message")
 	args, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("can't marshal msg: %w", err)
@@ -42,5 +42,6 @@ func (sender *Sender) SendMessage(ctx context.Context, msg messages.Message, que
 	if err := sender.gc.Enqueue(ctx, j); err != nil {
 		return fmt.Errorf("can't send msg to %s: %w", queue, err)
 	}
+	goapp.Log.Info().Msg("sending done")
 	return nil
 }
