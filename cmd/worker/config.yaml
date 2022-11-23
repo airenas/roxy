@@ -1,0 +1,11 @@
+db:
+    url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable  
+
+worker:
+    count: 3
+
+filer:
+    url: localhost:9000
+    user: roxy
+    key: roxy-int-secret
+    bucket: asr    

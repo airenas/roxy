@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
+	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/messages"
+	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/vgarvardt/gue/v5"
-	// amessages "github.com/airenas/async-api/pkg/messages"
 	// "github.com/airenas/big-tts/internal/pkg/messages"
 	// "github.com/airenas/big-tts/internal/pkg/status"
 	// "github.com/airenas/big-tts/internal/pkg/utils"
@@ -18,15 +20,22 @@ import (
 	// "github.com/streadway/amqp"
 )
 
-//Worker wraps some work functionality
-// type Worker interface {
-// 	Do(context.Context, *messages.TTSMessage) error
-// }
+//MsgSender provides send msg functionality
+type MsgSender interface {
+	SendMessage(context.Context, amessages.Message, string) error
+}
 
-// //MsgSender sends messages
-// type MsgSender interface {
-// 	Send(msg amessages.Message, queue, replyQueue string) error
-// }
+//DB provides persistnce functionality
+type DB interface {
+	LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error)
+	// LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error)
+	// SaveWorkData(ctx context.Context, wrkData *persistence.WorkData) (error)
+}
+
+//Filer retrieves files
+type Filer interface {
+	LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error)
+}
 
 //StatusSaver persists data to DB
 type StatusSaver interface {
@@ -38,6 +47,9 @@ type ServiceData struct {
 	GueClient   *gue.Client
 	WorkerCount int
 	Queue       string
+	MsgSender   MsgSender
+	DB          DB
+	Filer       Filer
 }
 
 //StartWorkerService starts the event queue listener service to listen for events
@@ -86,13 +98,35 @@ func workHandler(data *ServiceData) gue.WorkFunc {
 			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
 			return nil
 		}
-		return handleASR(&m)
+		return handleASR(ctx, &m, data)
 	}
 }
 
-func handleASR(m *messages.ASRMessage) error {
-	goapp.Log.Info().Msgf("handling %s", m.ID)
-	return fmt.Errorf("Err baaaad")
+func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
+	goapp.Log.Info().Str("ID", m.ID).Msg("handling")
+	err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
+		QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
+		Type:         amessages.InformTypeStarted, At: time.Now()}, messages.Inform)
+	if err != nil {
+		return fmt.Errorf("can't send msg: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msg("load request")
+	req, err := data.DB.LoadRequest(ctx, m.ID)
+	_ = req
+	if err != nil {
+		return fmt.Errorf("can't load request: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", req)
+	goapp.Log.Info().Str("ID", m.ID).Msg("load file")
+	file, err := data.Filer.LoadFile(ctx, m.ID+".wav")
+	_ = req
+	if err != nil {
+		return fmt.Errorf("can't load filr: %w", err)
+	}
+	defer file.Close()
+	goapp.Log.Info().Str("ID", m.ID).Msg("loaded")
+
+	return nil
 }
 
 func validate(data *ServiceData) error {
@@ -104,6 +138,15 @@ func validate(data *ServiceData) error {
 	}
 	if data.WorkerCount < 1 {
 		return fmt.Errorf("no worker count provided")
+	}
+	if data.MsgSender == nil {
+		return fmt.Errorf("no msg sender")
+	}
+	if data.Filer == nil {
+		return fmt.Errorf("no Filer")
+	}
+	if data.DB == nil {
+		return fmt.Errorf("no DB")
 	}
 	return nil
 }

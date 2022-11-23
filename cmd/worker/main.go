@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/airenas/async-api/pkg/miniofs"
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/messages"
+	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/worker"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
@@ -26,21 +27,36 @@ func main() {
 
 	dbConfig, err := pgxpool.ParseConfig(cfg.GetString("db.url"))
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 	defer dbPool.Close()
 
 	data.GueClient, err = gue.NewClient(pgxv5.NewConnPool(dbPool))
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init gue: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init gue")
 	}
 	data.WorkerCount = cfg.GetInt("worker.count")
 	data.Queue = messages.Upload
+	data.MsgSender, err = postgres.NewSender(dbPool)
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")
+	}
+	data.Filer, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
+		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't init filer")
+	}
+	db, err := postgres.NewDB(dbPool)
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't init db")
+	}
+
+	data.DB = db
 
 	printBanner()
 
@@ -48,7 +64,7 @@ func main() {
 	// data.StopCtx = ctx
 	doneCh, err := worker.StartWorkerService(ctx, data)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't start worker service: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't start worker service")
 	}
 	/////////////////////// Waiting for terminate
 	waitCh := make(chan os.Signal, 2)

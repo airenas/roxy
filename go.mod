@@ -3,7 +3,7 @@ module github.com/airenas/roxy
 go 1.18
 
 require (
-	github.com/airenas/async-api v1.0.54
+	github.com/airenas/async-api v1.0.55
 	github.com/airenas/go-app v1.0.22
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
 	github.com/google/uuid v1.3.0
@@ -12,6 +12,7 @@ require (
 	github.com/labstack/echo/v4 v4.9.1
 	github.com/labstack/gommon v0.4.0
 	github.com/pkg/errors v0.9.1
+	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.1
 	github.com/vgarvardt/gue/v5 v5.0.0-20221117214937-23d992003b8e
 )
@@ -56,7 +57,6 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rs/xid v1.4.0 // indirect
-	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
@@ -68,7 +68,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	github.com/vgarvardt/backoff v1.0.0 // indirect
-	github.com/vgarvardt/gue v1.0.2 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/metric v0.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.11.1 // indirect

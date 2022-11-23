@@ -42,6 +42,6 @@ func (sender *Sender) SendMessage(ctx context.Context, msg messages.Message, que
 	if err := sender.gc.Enqueue(ctx, j); err != nil {
 		return fmt.Errorf("can't send msg to %s: %w", queue, err)
 	}
-	goapp.Log.Info().Msg("sending done")
+	goapp.Log.Debug().Msg("Sent")
 	return nil
 }

@@ -34,6 +34,17 @@ func (db *DB) SaveRequest(ctx context.Context, req *persistence.ReqData) error {
 	return nil
 }
 
+// LoadRequest loads request from DB
+func (db *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error) {
+	var res persistence.ReqData
+	err := db.pool.QueryRow(ctx, `SELECT id, email, file_count, params, request_id, created FROM requests
+		WHERE id = $1`, id).Scan(&res.ID, &res.Email, &res.FileCount, &res.Params, &res.RequestID, &res.Created)
+	if err != nil {
+		return nil, fmt.Errorf("can't load reguest: %w", err)
+	}
+	return &res, nil
+}
+
 // SaveStatus inserts status into DB
 func (db *DB) SaveStatus(ctx context.Context, item *persistence.Status) error {
 	rows, err := db.pool.Query(ctx, `INSERT INTO status(id, status, audio_ready, created) 
