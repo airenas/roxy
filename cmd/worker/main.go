@@ -11,6 +11,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/postgres"
+	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/worker"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
@@ -57,6 +58,12 @@ func main() {
 	}
 
 	data.DB = db
+
+	data.Transcriber, err = transcriber.NewClient(cfg.GetString("transcriber.uploadUrl"),
+		cfg.GetString("transcriber.statusUrl"), cfg.GetString("transcriber.resultUrl"), cfg.GetString("transcriber.cleanUrl"))
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't init transcriber")
+	}
 
 	printBanner()
 

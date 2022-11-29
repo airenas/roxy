@@ -11,6 +11,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/vgarvardt/gue/v5"
 	// "github.com/airenas/big-tts/internal/pkg/messages"
 	// "github.com/airenas/big-tts/internal/pkg/status"
@@ -28,8 +29,9 @@ type MsgSender interface {
 //DB provides persistnce functionality
 type DB interface {
 	LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error)
+	LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error)
 	// LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error)
-	// SaveWorkData(ctx context.Context, wrkData *persistence.WorkData) (error)
+	SaveWorkData(ctx context.Context, wrkData *persistence.WorkData) error
 }
 
 //Filer retrieves files
@@ -42,6 +44,12 @@ type StatusSaver interface {
 	Save(ID string, status, err string) error
 }
 
+//Transcriber provides transcription
+type Transcriber interface {
+	Upload(ctx context.Context, audio *tapi.UploadData) (string, error)
+	HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error)
+}
+
 // ServiceData keeps data required for service work
 type ServiceData struct {
 	GueClient   *gue.Client
@@ -50,11 +58,12 @@ type ServiceData struct {
 	MsgSender   MsgSender
 	DB          DB
 	Filer       Filer
+	Transcriber Transcriber
 }
 
 //StartWorkerService starts the event queue listener service to listen for events
 //returns channel for tracking if all jobs are finished
-func StartWorkerService(ctx context.Context, data *ServiceData) (<-chan struct{}, error) {
+func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, error) {
 	if err := validate(data); err != nil {
 		return nil, err
 	}
@@ -91,7 +100,7 @@ func workHandler(data *ServiceData) gue.WorkFunc {
 	return func(ctx context.Context, j *gue.Job) error {
 		var m messages.ASRMessage
 		if err := json.Unmarshal(j.Args, &m); err != nil {
-			return fmt.Errorf("could not message: %w", err)
+			return fmt.Errorf("could not unmarshal message: %w", err)
 		}
 		goapp.Log.Info().Str("id", m.ID).Int32("errCount", j.ErrorCount).Msg("got msg")
 		if j.ErrorCount > 2 {
@@ -117,16 +126,87 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 		return fmt.Errorf("can't load request: %w", err)
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", req)
-	goapp.Log.Info().Str("ID", m.ID).Msg("load file")
-	file, err := data.Filer.LoadFile(ctx, m.ID+".wav")
+	goapp.Log.Info().Str("ID", m.ID).Msg("load work data")
+	wd, err := data.DB.LoadWorkData(ctx, m.ID)
+	if err != nil {
+		return fmt.Errorf("can't load work data: %w", err)
+	}
+	if wd == nil {
+		extId, err := upload(ctx, req, data)
+		if err != nil {
+			return fmt.Errorf("can't upload: %w", err)
+		}
+		wd = &persistence.WorkData{ID: req.ID, ExternalID: extId, Created: time.Now()}
+		err = data.DB.SaveWorkData(ctx, wd)
+		if err != nil {
+			return fmt.Errorf("can't save work data: %w", err)
+		}
+	} else {
+		goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", wd)
+	}
+	// wait for finish
+	err = waitStatus(ctx, wd.ID, wd.ExternalID, data)
+	if err != nil {
+		return fmt.Errorf("can't wait for finish: %w", err)
+	}
+	goapp.Log.Info().Str("ID", wd.ID).Msg("Transcription completed")
+	// download audio
+	// download results
+	return nil
+}
+
+func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error {
+	stCh, cf, err := data.Transcriber.HookToStatus(ctx, extID)
+	if err != nil {
+		return fmt.Errorf("can't hook to status: %w", err)
+	}
+	defer cf()
+	for {
+		select {
+		case <-ctx.Done():
+			goapp.Log.Info().Msg("exit status channel loop")
+			return nil
+		case d, ok := <-stCh:
+			{
+				if !ok {
+					goapp.Log.Info().Msg("closed status channel")
+					return nil
+				}
+				finish, err := processStatus(&d, ID, data)
+				if err != nil {
+					return fmt.Errorf("can't process status: %w", err)
+				}
+				if finish {
+					return nil
+				}
+			}
+		}
+	}
+}
+
+func processStatus(statusData *tapi.StatusData, ID string, data *ServiceData) (bool, error) {
+	goapp.Log.Info().Str("status", statusData.Status).Str("ID", ID).Msg("status")
+	if statusData.Error != "" {
+		return statusData.Status == "COMPLETED", fmt.Errorf("err: %s, %s", statusData.ErrorCode, statusData.Error)
+	}
+	return statusData.Status == "COMPLETED", nil
+}
+
+func upload(ctx context.Context, req *persistence.ReqData, data *ServiceData) (string, error) {
+	goapp.Log.Info().Str("ID", req.ID).Msg("load file")
+	file, err := data.Filer.LoadFile(ctx, req.ID+".wav")
 	_ = req
 	if err != nil {
-		return fmt.Errorf("can't load filr: %w", err)
+		return "", fmt.Errorf("can't load file: %w", err)
 	}
 	defer file.Close()
-	goapp.Log.Info().Str("ID", m.ID).Msg("loaded")
-
-	return nil
+	goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
+	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
+	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: req.Params, Files: map[string]io.Reader{req.ID + ".wav": file}})
+	if err != nil {
+		return "", fmt.Errorf("can't upload: %w", err)
+	}
+	return extID, nil
 }
 
 func validate(data *ServiceData) error {
@@ -147,6 +227,9 @@ func validate(data *ServiceData) error {
 	}
 	if data.DB == nil {
 		return fmt.Errorf("no DB")
+	}
+	if data.Transcriber == nil {
+		return fmt.Errorf("no Transcriber")
 	}
 	return nil
 }

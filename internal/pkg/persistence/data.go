@@ -15,6 +15,13 @@ type (
 		RequestID string
 	}
 
+	//ReqData table
+	WorkData struct {
+		ID         string
+		ExternalID string
+		Created    time.Time
+	}
+
 	//Status information table
 	Status struct {
 		ID               string

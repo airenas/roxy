@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,6 +44,31 @@ func (db *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData,
 		return nil, fmt.Errorf("can't load reguest: %w", err)
 	}
 	return &res, nil
+}
+
+// LoadWorkData loads work info from DB
+func (db *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error) {
+	var res persistence.WorkData
+	err := db.pool.QueryRow(ctx, `SELECT id, external_id, created FROM work_data
+		WHERE id = $1`, id).Scan(&res.ID, &res.ExternalID, &res.Created)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("can't load reguest: %w", err)
+	}
+	return &res, nil
+}
+
+// SaveWorkData inserts data into DB
+func (db *DB) SaveWorkData(ctx context.Context, data *persistence.WorkData) error {
+	rows, err := db.pool.Query(ctx, `INSERT INTO work_data(id, external_id, created) 
+	VALUES($1, $2, $3)`, data.ID, data.ExternalID, data.Created)
+	if err != nil {
+		return fmt.Errorf("can't insert work_data: %w", err)
+	}
+	defer rows.Close()
+	return nil
 }
 
 // SaveStatus inserts status into DB

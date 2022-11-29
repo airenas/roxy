@@ -1,4 +1,4 @@
---SQL statements for a request table
+--SQL statements for a status table
 BEGIN;
 
 CREATE TABLE status(

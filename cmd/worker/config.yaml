@@ -1,3 +1,6 @@
+logger:
+    level: DEBUG
+    
 db:
     url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable  
 
@@ -8,4 +11,8 @@ filer:
     url: localhost:9000
     user: roxy
     key: roxy-int-secret
-    bucket: asr    
+    bucket: asr  
+
+transcriber:
+    uploadUrl: https://atpazinimas.intelektika.lt/ausis/transcriber/upload
+    statusURL: wss://atpazinimas.intelektika.lt/ausis/status.service/subscribe
