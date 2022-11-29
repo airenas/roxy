@@ -279,10 +279,10 @@ func newTransport() http.RoundTripper {
 func invokeWithBackoff[K any](f func() (K, error), b backoff.BackOff) (K, error) {
 	c := 0
 	op := func() (K, error) {
-		c++
 		if c > 0 {
 			goapp.Log.Info().Int("count", c).Msg("retry")
 		}
+		c++
 		res, err := f()
 		if !isRetryable(err) {
 			return res, backoff.Permanent(err)
