@@ -14,6 +14,8 @@ const (
 	Fail = st + "Fail"
 	// Inform  queue name
 	Inform = st + "Inform"
+	// StatusChange queue name
+	StatusChange = st + "StatusChange"
 )
 
 // ASRMessage main message passing through in roxy asr system
@@ -25,4 +27,16 @@ type ASRMessage struct {
 // NewMessageFrom creates a copy of a message
 func NewMessageFrom(m *ASRMessage) *ASRMessage {
 	return &ASRMessage{QueueMessage: m.QueueMessage, RequestID: m.RequestID}
+}
+
+// StatusMessage main message passing through in roxy asr system
+type StatusMessage struct {
+	amessages.QueueMessage
+	Status           string   `json:"status,omitempty"`
+	Error            string   `json:"error,omitempty"`
+	Progress         int      `json:"progress,omitempty"`
+	ErrorCode        string   `json:"errorCode,omitempty"`
+	AudioReady       bool     `json:"audioReady,omitempty"`
+	AvailableResults []string `json:"avResults,omitempty"`
+	ExternalID       string   `json:"extID,omitempty"`
 }

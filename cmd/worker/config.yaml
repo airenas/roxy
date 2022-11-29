@@ -1,6 +1,6 @@
 logger:
     level: DEBUG
-    
+
 db:
     url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable  
 
@@ -16,3 +16,5 @@ filer:
 transcriber:
     uploadUrl: https://atpazinimas.intelektika.lt/ausis/transcriber/upload
     statusURL: wss://atpazinimas.intelektika.lt/ausis/status.service/subscribe
+    resultURL: https://atpazinimas.intelektika.lt/ausis/result.service
+    cleanURL: https://atpazinimas.intelektika.lt/ausis/clean.service

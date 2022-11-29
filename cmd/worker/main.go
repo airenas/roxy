@@ -9,7 +9,6 @@ import (
 
 	"github.com/airenas/async-api/pkg/miniofs"
 	"github.com/airenas/go-app/pkg/goapp"
-	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/worker"
@@ -42,7 +41,6 @@ func main() {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue")
 	}
 	data.WorkerCount = cfg.GetInt("worker.count")
-	data.Queue = messages.Upload
 	data.MsgSender, err = postgres.NewSender(dbPool)
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")

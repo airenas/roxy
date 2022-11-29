@@ -188,12 +188,12 @@ func (m *mockSaver) SaveFile(ctx context.Context, name string, r io.Reader) erro
 
 type mockDB struct{ mock.Mock }
 
-func (m *mockDB) SaveRequest(ctx context.Context, req *persistence.ReqData) error {
+func (m *mockDB) InsertRequest(ctx context.Context, req *persistence.ReqData) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)
 }
 
-func (m *mockDB) SaveStatus(ctx context.Context, req *persistence.Status) error {
+func (m *mockDB) InsertStatus(ctx context.Context, req *persistence.Status) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)
 }

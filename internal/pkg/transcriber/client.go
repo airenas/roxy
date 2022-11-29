@@ -32,6 +32,18 @@ type Client struct {
 //NewClient creates a transcriber client
 func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error) {
 	res := Client{}
+	if uploadURL == "" {
+		return nil, fmt.Errorf("no uploadURL")
+	}
+	if statusURL == "" {
+		return nil, fmt.Errorf("no statusURL")
+	}
+	if resultURL == "" {
+		return nil, fmt.Errorf("no resultURL")
+	}
+	if cleanURL == "" {
+		return nil, fmt.Errorf("no cleanURL")
+	}
 	res.uploadURL = uploadURL
 	res.uploadTimeout = time.Minute * 10
 	res.statusURL = statusURL
@@ -92,7 +104,7 @@ func (sp *Client) GetAudio(ctx context.Context, ID string) (*tapi.FileData, erro
 
 // GetResult return results file
 func (sp *Client) GetResult(ctx context.Context, ID, name string) (*tapi.FileData, error) {
-	return sp.getFile(ctx, fmt.Sprintf("%s/result/%s", sp.resultURL, ID))
+	return sp.getFile(ctx, fmt.Sprintf("%s/result/%s/%s", sp.resultURL, ID, name))
 }
 
 func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, error) {
@@ -131,7 +143,7 @@ func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, e
 
 func parseName(s string) (string, error) {
 	_, params, err := mime.ParseMediaType(s)
-	if err == nil {
+	if err != nil {
 		return "", fmt.Errorf("can't parse header: %w", err)
 	}
 	return params["filename"], nil
@@ -211,7 +223,7 @@ func (sp *Client) Clean(ctx context.Context, ID string) error {
 	goapp.Log.Info().Str("url", sp.cleanURL).Msg("delete")
 	ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 	defer cancelF()
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/clean/%s", sp.cleanURL, ID), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", sp.cleanURL, ID), nil)
 	if err != nil {
 		return err
 	}

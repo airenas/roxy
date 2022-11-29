@@ -42,8 +42,8 @@ type MsgSender interface {
 
 //DBSaver saves requests to DB
 type DBSaver interface {
-	SaveRequest(ctx context.Context, req *persistence.ReqData) error
-	SaveStatus(ctx context.Context, req *persistence.Status) error
+	InsertRequest(ctx context.Context, req *persistence.ReqData) error
+	InsertStatus(ctx context.Context, req *persistence.Status) error
 }
 
 // Data keeps data required for service work
@@ -170,12 +170,12 @@ func upload(data *Data) func(echo.Context) error {
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
-		err = data.DBSaver.SaveRequest(ctx, &rd)
+		err = data.DBSaver.InsertRequest(ctx, &rd)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = data.DBSaver.SaveStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
+		err = data.DBSaver.InsertStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
 			Created: time.Now(), AudioReady: audioReady})
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()

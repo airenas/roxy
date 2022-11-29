@@ -1,6 +1,9 @@
 package persistence
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type (
 
@@ -26,11 +29,13 @@ type (
 	Status struct {
 		ID               string
 		Status           string
-		Error            string
-		ErrorCode        string
+		Error            sql.NullString
+		ErrorCode        sql.NullString
 		AudioReady       bool
+		Progress         sql.NullInt32
 		AvailableResults []string
 		Created          time.Time
 		Updated          time.Time
+		Version          int
 	}
 )

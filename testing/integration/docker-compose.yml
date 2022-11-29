@@ -8,7 +8,9 @@ services:
     environment:
       - FILER_URL=minio:9000
       - FILER_KEY=${MINIO_PASS}
-      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable  
+      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
+    ports:
+      - 8181:8000    
 
   migrate:
     image: airenas/roxy-dbmigrate:${migrate_version}
