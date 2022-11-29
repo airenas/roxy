@@ -10,7 +10,20 @@ services:
       - FILER_KEY=${MINIO_PASS}
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
     ports:
-      - 8181:8000    
+      - 8181:8000
+
+
+  worker:
+    image: airenas/roxy-worker:${worker_version}
+    restart: on-failure
+    environment:
+      - FILER_URL=minio:9000
+      - FILER_KEY=${MINIO_PASS}
+      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
+      - TRANSCRIBER_UPLOADURL=http://integration-tests:9876/ausis/transcriber/upload
+      - TRANSCRIBER_STATUSURL=http://integration-tests:9876/ausis/status.service/subscribe
+      - TRANSCRIBER_RESULTURL=http://integration-tests:9876/ausis/ausis/result.service
+      - TRANSCRIBER_CLEANURL=http://integration-tests:9876/ausis/clean.service
 
   migrate:
     image: airenas/roxy-dbmigrate:${migrate_version}

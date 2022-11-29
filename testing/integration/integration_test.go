@@ -8,8 +8,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -36,6 +39,11 @@ func TestMain(m *testing.M) {
 	WaitForOpenOrFail(tCtx, cfg.dbURL)
 	WaitForOpenOrFail(tCtx, cfg.uploadURL)
 	waitForDB(tCtx, cfg.dbURL)
+
+	//start mocks service for private services - not in this docker compose
+	l, ts := startMockService(9876)
+	defer ts.Close()
+	defer l.Close()
 
 	os.Exit(m.Run())
 }
@@ -87,4 +95,29 @@ func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Re
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("x-doorman-requestid", "m:testRequestID")
 	return req
+}
+
+func startMockService(port int) (net.Listener, *httptest.Server) {
+	// create a listener with the desired port.
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatalf("can't start mock service: %v", err)
+	}
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// log.Printf("request to: " + r.URL.String())
+		switch r.URL.String() {
+		case "/ausis/":
+			io.Copy(w, strings.NewReader(`"Olia"`))
+		default:
+			log.Printf("Unknown request to: " + r.URL.String())
+		}
+	}))
+
+	ts.Listener.Close()
+	ts.Listener = l
+
+	// Start the server.
+	ts.Start()
+	log.Printf("started mock srv on port: %d", port)
+	return l, ts
 }
