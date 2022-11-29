@@ -1,0 +1,19 @@
+# logger:
+#     level: DEBUG
+# db:
+#     url: postgres://roxy:xxx@localhost:5432/asr?sslmode=disable  
+
+worker:
+    count: 20
+
+filer:
+    # url: localhost:9000
+    user: roxy
+    # key: xxx
+    bucket: asr  
+
+transcriber:
+    uploadUrl: https://atpazinimas.intelektika.lt/ausis/transcriber/upload
+    statusURL: wss://atpazinimas.intelektika.lt/ausis/status.service/subscribe
+    resultURL: https://atpazinimas.intelektika.lt/ausis/result.service
+    cleanURL: https://atpazinimas.intelektika.lt/ausis/clean.service
