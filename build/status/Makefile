@@ -2,7 +2,6 @@
 #####################################################################################
 service=airenas/roxy-status
 version?=$(status_version)
-file=build/status/Dockerfile
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 

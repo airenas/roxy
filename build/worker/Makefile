@@ -2,7 +2,6 @@
 #####################################################################################
 service=airenas/roxy-worker
 version?=$(worker_version)
-file=build/worker/Dockerfile
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 

@@ -2,7 +2,6 @@
 #####################################################################################
 service=airenas/roxy-upload
 version?=$(upload_version)
-file=build/upload/Dockerfile
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 
