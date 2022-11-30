@@ -22,7 +22,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//Client comunicates with transcriber service
+// Client comunicates with transcriber service
 type Client struct {
 	httpclient    *http.Client
 	uploadURL     string
@@ -34,7 +34,7 @@ type Client struct {
 	backoff       func() backoff.BackOff
 }
 
-//NewClient creates a transcriber client
+// NewClient creates a transcriber client
 func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error) {
 	res := Client{}
 	if uploadURL == "" {
@@ -60,12 +60,12 @@ func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error
 	return &res, nil
 }
 
-//GetStatus get status from the server
+// GetStatus get status from the server
 func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error) {
 	goapp.Log.Info().Str("url", sp.statusURL).Str("ID", ID).Msg("connect")
-	c, err := invokeWithBackoff(func() (*websocket.Conn, error) {
+	c, err := invokeWithBackoff(ctx, func() (*websocket.Conn, bool, error) {
 		c, _, err := websocket.DefaultDialer.DialContext(ctx, sp.statusURL, nil)
-		return c, err
+		return c, isRetryable(err), err
 	}, sp.backoff())
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't dial to status URL: %w", err)
@@ -118,17 +118,17 @@ func (sp *Client) GetResult(ctx context.Context, ID, name string) (*tapi.FileDat
 
 func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, error) {
 	goapp.Log.Info().Str("url", urlStr).Msg("get file")
-	return invokeWithBackoff(func() (*tapi.FileData, error) {
+	return invokeWithBackoff(ctx, func() (*tapi.FileData, bool, error) {
 		ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 		defer cancelF()
 		req, err := http.NewRequest(http.MethodGet, urlStr, nil)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		req = req.WithContext(ctx)
 		resp, err := sp.httpclient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("can't call: %w", err)
+			return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
 		}
 		defer func() {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -136,19 +136,19 @@ func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, e
 		}()
 		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-			return nil, err
+			return nil, isRetryableCode(resp.StatusCode), err
 		}
 		br, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("can't read body: %w", err)
+			return nil, isRetryable(err), fmt.Errorf("can't read body: %w", err)
 		}
 		res := &tapi.FileData{}
 		res.Content = br
 		res.Name, err = parseName(resp.Header.Get("content-disposition"))
 		if err != nil {
-			return nil, fmt.Errorf("can't read name: %w", err)
+			return nil, false, fmt.Errorf("can't read name: %w", err)
 		}
-		return res, nil
+		return res, false, nil
 	}, sp.backoff())
 }
 
@@ -164,7 +164,7 @@ type uploadResponse struct {
 	ID string `json:"id"`
 }
 
-//Upload uploads audio to transcriber service
+// Upload uploads audio to transcriber service
 func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -185,11 +185,11 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 	}
 	writer.Close()
 
-	return invokeWithBackoff(func() (string, error) {
+	return invokeWithBackoff(ctx, func() (string, bool, error) {
 		var respData uploadResponse
 		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, body)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 
@@ -199,7 +199,7 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 		goapp.Log.Info().Str("url", req.URL.String()).Str("method", req.Method).Msg("call")
 		resp, err := sp.httpclient.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("can't call: %w", err)
+			return "", isRetryable(err), fmt.Errorf("can't call: %w", err)
 		}
 		defer func() {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -207,20 +207,20 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 		}()
 		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-			return "", err
+			return "", isRetryableCode(resp.StatusCode), err
 		}
 		br, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return "", fmt.Errorf("can't read body: %w", err)
+			return "", isRetryable(err), fmt.Errorf("can't read body: %w", err)
 		}
 		err = json.Unmarshal(br, &respData)
 		if err != nil {
-			return "", fmt.Errorf("can't decode response: %w", err)
+			return "", true, fmt.Errorf("can't decode response: %w", err)
 		}
 		if respData.ID == "" {
-			return "", fmt.Errorf("can't get ID from response")
+			return "", false, fmt.Errorf("can't get ID from response")
 		}
-		return respData.ID, nil
+		return respData.ID, false, nil
 	}, sp.backoff())
 }
 
@@ -234,19 +234,19 @@ func getFileParam(i int) string {
 // Clean removes all transcription data related with ID
 func (sp *Client) Clean(ctx context.Context, ID string) error {
 	goapp.Log.Info().Str("url", sp.cleanURL).Msg("delete")
-	_, err := invokeWithBackoff(
-		func() (interface{}, error) {
+	_, err := invokeWithBackoff(ctx,
+		func() (interface{}, bool, error) {
 			ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 			defer cancelF()
 			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", sp.cleanURL, ID), nil)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			req = req.WithContext(ctx)
 
 			resp, err := sp.httpclient.Do(req)
 			if err != nil {
-				return nil, fmt.Errorf("can't call: %w", err)
+				return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
 			}
 			defer func() {
 				_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -254,11 +254,15 @@ func (sp *Client) Clean(ctx context.Context, ID string) error {
 			}()
 			if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 				err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-				return nil, err
+				return nil, isRetryableCode(resp.StatusCode), err
 			}
-			return nil, nil
+			return nil, false, nil
 		}, sp.backoff())
 	return err
+}
+
+func isRetryableCode(c int) bool {
+	return c != http.StatusBadRequest && c != http.StatusUnauthorized && c != http.StatusNotFound && c != http.StatusConflict
 }
 
 func asrHTTPClient() *http.Client {
@@ -276,15 +280,21 @@ func newTransport() http.RoundTripper {
 	return res
 }
 
-func invokeWithBackoff[K any](f func() (K, error), b backoff.BackOff) (K, error) {
+func invokeWithBackoff[K any](ctx context.Context, f func() (K, bool, error), b backoff.BackOff) (K, error) {
 	c := 0
 	op := func() (K, error) {
-		if c > 0 {
-			goapp.Log.Info().Int("count", c).Msg("retry")
+		select {
+		case <-ctx.Done():
+			return *new(K), backoff.Permanent(context.DeadlineExceeded)
+		default:
+			if c > 0 {
+				goapp.Log.Info().Int("count", c).Msg("retry")
+			}
 		}
 		c++
-		res, err := f()
-		if !isRetryable(err) {
+		res, retry, err := f()
+		if err != nil && !retry {
+			goapp.Log.Info().Msg("not retryable error")
 			return res, backoff.Permanent(err)
 		}
 		return res, err
