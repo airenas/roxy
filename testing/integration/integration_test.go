@@ -114,7 +114,7 @@ func TestStatus_Check(t *testing.T) {
 	assert.NotEmpty(t, ur.ID)
 	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
-	dur := time.Second * 10
+	dur := time.Second * 60
 	tm := time.After(dur)
 	for {
 		select {
