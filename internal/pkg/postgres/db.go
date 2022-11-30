@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -15,7 +16,7 @@ type DB struct {
 	pool *pgxpool.Pool
 }
 
-//NewDB creates Request instance
+// NewDB creates Request instance
 func NewDB(pool *pgxpool.Pool) (*DB, error) {
 	res := &DB{pool: pool}
 	return res, nil
@@ -85,8 +86,12 @@ func (db *DB) InsertStatus(ctx context.Context, item *persistence.Status) error 
 
 // LoadStatus loads work info from DB
 func (db *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, error) {
+	_, err := uuid.Parse(id) // otherwise psql complains on non uuid search
+	if err != nil {
+		return nil, nil
+	}
 	var res persistence.Status
-	err := db.pool.QueryRow(ctx, `SELECT id, status, progress, error_code, error,
+	err = db.pool.QueryRow(ctx, `SELECT id, status, progress, error_code, error,
     audio_ready, available_results, version FROM status
 		WHERE id = $1`, id).Scan(&res.ID, &res.Status, &res.Progress, &res.ErrorCode,
 		&res.Error, &res.AudioReady, &res.AvailableResults, &res.Version)
