@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/airenas/roxy/internal/pkg/postgres"
+	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
@@ -118,6 +119,25 @@ func waitForDB(ctx context.Context, URL string) {
 			log.Fatalf("FAIL: can't access db")
 			break
 		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+func handleStatusWS(rw http.ResponseWriter, req *http.Request, rf func() string) {
+	upgrader := websocket.Upgrader{}
+	c, err := upgrader.Upgrade(rw, req, nil)
+	if err != nil {
+		return
+	}
+	defer c.Close()
+	for {
+		mt, _, err := c.ReadMessage()
+		if err != nil {
+			break
+		}
+		err = c.WriteMessage(mt, []byte(rf()))
+		if err != nil {
+			break
 		}
 	}
 }

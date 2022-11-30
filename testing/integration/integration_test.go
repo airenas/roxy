@@ -86,10 +86,7 @@ func TestStatusLive(t *testing.T) {
 
 func TestStatus_Check_None(t *testing.T) {
 	t.Parallel()
-	resp := Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/10", nil))
-	CheckCode(t, resp, http.StatusOK)
-	var st api.StatusData
-	Decode(t, resp, &st)
+	st := getStatus(t, "10")
 	assert.Equal(t, "NOT_FOUND", st.Error)
 	assert.Equal(t, "10", st.ID)
 }
@@ -98,12 +95,12 @@ type uploadResponse struct {
 	ID string `json:"id"`
 }
 
-func getStatus(t *testing.T, id string) string {
+func getStatus(t *testing.T, id string) api.StatusData {
 	resp := Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+id, nil))
 	CheckCode(t, resp, http.StatusOK)
 	var st api.StatusData
 	Decode(t, resp, &st)
-	return st.Status
+	return st
 }
 
 func TestStatus_Check(t *testing.T) {
@@ -115,10 +112,7 @@ func TestStatus_Check(t *testing.T) {
 	var ur uploadResponse
 	Decode(t, resp, &ur)
 	assert.NotEmpty(t, ur.ID)
-	resp = Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+ur.ID, nil))
-	CheckCode(t, resp, http.StatusOK)
-	var st api.StatusData
-	Decode(t, resp, &st)
+	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
 	dur := time.Second * 10
 	tm := time.After(dur)
@@ -127,8 +121,8 @@ func TestStatus_Check(t *testing.T) {
 		case <-tm:
 			require.Failf(t, "Fail", "Not COMPLETED in %v", dur)
 		default:
-			st := getStatus(t, ur.ID)
-			if st == "COMPLETED" {
+			st = getStatus(t, ur.ID)
+			if st.Status == "COMPLETED" {
 				return
 			}
 			time.Sleep(time.Second)
@@ -168,8 +162,20 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// log.Printf("request to: " + r.URL.String())
 		switch r.URL.String() {
-		case "/ausis/":
-			io.Copy(w, strings.NewReader(`"Olia"`))
+		case "/ausis/transcriber/upload":
+			io.Copy(w, strings.NewReader(`{"id":"1111"}`))
+		case "/ausis/status.service/subscribe":
+			handleStatusWS(w, r, func() string {
+				return `{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"]}`
+			})
+		case "/ausis/result.service/result/1111/lat.txt":
+			w.Header().Add("content-disposition", `attachment; filename="lat123.txt"`)
+			io.Copy(w, strings.NewReader(`file content`))
+		case "/ausis/result.service/result/1111/res.txt":
+			w.Header().Add("content-disposition", `attachment; filename="lat123res.txt"`)
+			io.Copy(w, strings.NewReader(`file content`))
+		case "/ausis/clean.service/1111":
+			io.Copy(w, strings.NewReader(`OK`))
 		default:
 			log.Printf("Unknown request to: " + r.URL.String())
 		}
