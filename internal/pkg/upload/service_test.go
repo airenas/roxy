@@ -39,8 +39,8 @@ func initTest(t *testing.T) {
 	tData.MsgSender = senderMock
 	tEcho = initRoutes(tData)
 	tResp = httptest.NewRecorder()
-	dbMock.On("SaveRequest", mock.Anything, mock.Anything).Return(nil)
-	dbMock.On("SaveStatus", mock.Anything, mock.Anything).Return(nil)
+	dbMock.On("InsertRequest", mock.Anything, mock.Anything).Return(nil)
+	dbMock.On("InsertStatus", mock.Anything, mock.Anything).Return(nil)
 	saverMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 }
@@ -106,7 +106,7 @@ func Test_Fails_ReqSaver(t *testing.T) {
 	initTest(t)
 	req := newTestRequest("file", "file.wav", "olia", nil)
 	dbMock.ExpectedCalls = nil
-	dbMock.On("SaveRequest", mock.Anything, mock.Anything).Return(fmt.Errorf("err"))
+	dbMock.On("InsertRequest", mock.Anything, mock.Anything).Return(fmt.Errorf("err"))
 
 	testCode(t, req, http.StatusInternalServerError)
 }
