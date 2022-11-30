@@ -24,6 +24,12 @@ type ASRMessage struct {
 	RequestID string `json:"requestID,omitempty"`
 }
 
+// CleanMessage message to clean external data
+type CleanMessage struct {
+	amessages.QueueMessage
+	ExternalID string `json:"extID,omitempty"`
+}
+
 // NewMessageFrom creates a copy of a message
 func NewMessageFrom(m *ASRMessage) *ASRMessage {
 	return &ASRMessage{QueueMessage: m.QueueMessage, RequestID: m.RequestID}

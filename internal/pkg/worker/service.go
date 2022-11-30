@@ -160,7 +160,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 }
 
 func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceData) error {
-	goapp.Log.Info().Str("ID", m.ID).Msg("handling")
+	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling")
 	goapp.Log.Info().Str("ID", m.ID).Msg("load status")
 	status, err := data.DB.LoadStatus(ctx, m.ID)
 	if err != nil {
@@ -207,8 +207,9 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		return fmt.Errorf("can't send msg: %w", err)
 	}
 	if isCompleted(m.Status, m.Error) {
-		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
-			QueueMessage: amessages.QueueMessage{ID: m.ID}}, wrkQueuePrefix+wrkStatusClean)
+		err = data.MsgSender.SendMessage(ctx, messages.CleanMessage{
+			QueueMessage: amessages.QueueMessage{ID: m.ID}, ExternalID: m.ExternalID},
+			wrkQueuePrefix+wrkStatusClean)
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
@@ -216,9 +217,9 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	return nil
 }
 
-func handleClean(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
-	goapp.Log.Info().Str("ID", m.ID).Msg("handling")
-	err := data.Transcriber.Clean(ctx, m.ID)
+func handleClean(ctx context.Context, m *messages.CleanMessage, data *ServiceData) error {
+	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling")
+	err := data.Transcriber.Clean(ctx, m.ExternalID)
 	if err != nil {
 		return fmt.Errorf("can't clean external data: %w", err)
 	}
