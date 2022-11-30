@@ -91,6 +91,9 @@ func (db *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, e
 		WHERE id = $1`, id).Scan(&res.ID, &res.Status, &res.Progress, &res.ErrorCode,
 		&res.Error, &res.AudioReady, &res.AvailableResults, &res.Version)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("can't load reguest: %w", err)
 	}
 	return &res, nil
