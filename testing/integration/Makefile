@@ -12,7 +12,7 @@ help:
 #####################################################################################
 ## start all containers
 start: 
-	docker compose up $(async) db migrate minio upload worker
+	docker compose up $(async) db migrate minio upload worker status
 .PHONY: start
 psql/roxy:
 	docker compose exec -e PGPASSWORD=$(PSQL_PASS) db psql -U roxy -h localhost -d asr

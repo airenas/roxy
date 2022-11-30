@@ -18,11 +18,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/airenas/roxy/internal/pkg/transcriber/api"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type config struct {
 	uploadURL  string
+	statusURL  string
 	dbURL      string
 	httpclient *http.Client
 }
@@ -31,6 +34,7 @@ var cfg config
 
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
+	cfg.statusURL = GetEnvOrFail("STATUS_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
 
@@ -38,6 +42,7 @@ func TestMain(m *testing.M) {
 	defer cf()
 	WaitForOpenOrFail(tCtx, cfg.dbURL)
 	WaitForOpenOrFail(tCtx, cfg.uploadURL)
+	WaitForOpenOrFail(tCtx, cfg.statusURL)
 	waitForDB(tCtx, cfg.dbURL)
 
 	//start mocks service for private services - not in this docker compose
@@ -48,7 +53,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestLive(t *testing.T) {
+func TestUploadLive(t *testing.T) {
 	t.Parallel()
 	CheckCode(t, Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.uploadURL, "/live", nil)), http.StatusOK)
 }
@@ -72,6 +77,63 @@ func TestUpload_Fail_NoFile(t *testing.T) {
 	req := newUploadRequest(t, []string{}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
 	CheckCode(t, Invoke(t, cfg.httpclient, req), http.StatusBadRequest)
+}
+
+func TestStatusLive(t *testing.T) {
+	t.Parallel()
+	CheckCode(t, Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "/live", nil)), http.StatusOK)
+}
+
+func TestStatus_Check_None(t *testing.T) {
+	t.Parallel()
+	resp := Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/10", nil))
+	CheckCode(t, resp, http.StatusOK)
+	var st api.StatusData
+	Decode(t, resp, &st)
+	assert.Equal(t, "NOT_FOUND", st.Error)
+	assert.Equal(t, "10", st.ID)
+}
+
+type uploadResponse struct {
+	ID string `json:"id"`
+}
+
+func getStatus(t *testing.T, id string) string {
+	resp := Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+id, nil))
+	CheckCode(t, resp, http.StatusOK)
+	var st api.StatusData
+	Decode(t, resp, &st)
+	return st.Status
+}
+
+func TestStatus_Check(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
+		{"numberOfSpeakers", "1"}})
+	resp := Invoke(t, cfg.httpclient, req)
+	CheckCode(t, resp, http.StatusOK)
+	var ur uploadResponse
+	Decode(t, resp, &ur)
+	assert.NotEmpty(t, ur.ID)
+	resp = Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+ur.ID, nil))
+	CheckCode(t, resp, http.StatusOK)
+	var st api.StatusData
+	Decode(t, resp, &st)
+	assert.NotEqual(t, "NOT_FOUND", st.Status)
+	dur := time.Second * 10
+	tm := time.After(dur)
+	for {
+		select {
+		case <-tm:
+			require.Failf(t, "Fail", "Not COMPLETED in %v", dur)
+		default:
+			st := getStatus(t, ur.ID)
+			if st == "COMPLETED" {
+				return
+			}
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Request {

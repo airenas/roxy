@@ -62,7 +62,8 @@ func listen(urlStr string) error {
 
 func NewRequest(t *testing.T, method string, srv, urlSuffix string, body interface{}) *http.Request {
 	t.Helper()
-	req, err := http.NewRequest(method, srv+urlSuffix, ToReader(body))
+	path, _ := url.JoinPath(srv, urlSuffix)
+	req, err := http.NewRequest(method, path, ToReader(body))
 	require.Nil(t, err, "not nil error = %v", err)
 	if body != nil {
 		req.Header.Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
