@@ -20,10 +20,10 @@ services:
       - FILER_URL=minio:9000
       - FILER_KEY=${MINIO_PASS}
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
-      - TRANSCRIBER_UPLOADURL=http://integration-tests:9876/ausis/transcriber/upload
-      - TRANSCRIBER_STATUSURL=http://integration-tests:9876/ausis/status.service/subscribe
-      - TRANSCRIBER_RESULTURL=http://integration-tests:9876/ausis/ausis/result.service
-      - TRANSCRIBER_CLEANURL=http://integration-tests:9876/ausis/clean.service
+      - TRANSCRIBER_UPLOADURL=http${TRANSCRIPTION_URL_PART}/ausis/transcriber/upload
+      - TRANSCRIBER_STATUSURL=ws${TRANSCRIPTION_URL_PART}/ausis/status.service/subscribe
+      - TRANSCRIBER_RESULTURL=http${TRANSCRIPTION_URL_PART}/ausis/result.service
+      - TRANSCRIBER_CLEANURL=http${TRANSCRIPTION_URL_PART}/ausis/clean.service
 
   migrate:
     image: airenas/roxy-dbmigrate:${migrate_version}
