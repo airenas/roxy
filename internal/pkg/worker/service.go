@@ -16,12 +16,12 @@ import (
 	"github.com/vgarvardt/gue/v5"
 )
 
-//MsgSender provides send msg functionality
+// MsgSender provides send msg functionality
 type MsgSender interface {
 	SendMessage(context.Context, amessages.Message, string) error
 }
 
-//DB provides persistnce functionality
+// DB provides persistnce functionality
 type DB interface {
 	LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error)
 	LoadStatus(ctx context.Context, id string) (*persistence.Status, error)
@@ -30,18 +30,18 @@ type DB interface {
 	UpdateStatus(context.Context, *persistence.Status) error
 }
 
-//Filer retrieves files
+// Filer retrieves files
 type Filer interface {
 	LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error)
 	SaveFile(ctx context.Context, name string, r io.Reader) error
 }
 
-//StatusSaver persists data to DB
+// StatusSaver persists data to DB
 type StatusSaver interface {
 	Save(ID string, status, err string) error
 }
 
-//Transcriber provides transcription
+// Transcriber provides transcription
 type Transcriber interface {
 	Upload(ctx context.Context, audio *tapi.UploadData) (string, error)
 	HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error)
@@ -66,8 +66,8 @@ const (
 	wrkStatusClean = "wrk-clean"
 )
 
-//StartWorkerService starts the event queue listener service to listen for events
-//returns channel for tracking if all jobs are finished
+// StartWorkerService starts the event queue listener service to listen for events
+// returns channel for tracking if all jobs are finished
 func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, error) {
 	if err := validate(data); err != nil {
 		return nil, err
@@ -75,9 +75,9 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Upload: workHandler(data),
-		wrkStatusQueue:  statusHandler(data),
-		wrkStatusClean:  cleanHandler(data),
+		messages.Upload: createHandler(data, handleASR),
+		wrkStatusQueue:  createHandler(data, handleStatus),
+		wrkStatusClean:  createHandler(data, handleClean),
 	}
 
 	pool, err := gue.NewWorkerPool(
@@ -103,48 +103,18 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	return res, nil
 }
 
-func workHandler(data *ServiceData) gue.WorkFunc {
+func createHandler[TM amessages.Message](data *ServiceData, hf func(context.Context, *TM, *ServiceData) error) gue.WorkFunc {
 	return func(ctx context.Context, j *gue.Job) error {
-		var m messages.ASRMessage
+		var m TM
 		if err := json.Unmarshal(j.Args, &m); err != nil {
 			return fmt.Errorf("could not unmarshal message: %w", err)
 		}
-		goapp.Log.Info().Str("id", m.ID).Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("got msg")
+		goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("got msg")
 		if j.ErrorCount > 2 {
 			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
 			return nil
 		}
-		return handleASR(ctx, &m, data)
-	}
-}
-
-func statusHandler(data *ServiceData) gue.WorkFunc {
-	return func(ctx context.Context, j *gue.Job) error {
-		var m messages.StatusMessage
-		if err := json.Unmarshal(j.Args, &m); err != nil {
-			return fmt.Errorf("could not unmarshal message: %w", err)
-		}
-		goapp.Log.Info().Str("id", m.ID).Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("got msg")
-		if j.ErrorCount > 2 {
-			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
-			return nil
-		}
-		return handleStatus(ctx, &m, data)
-	}
-}
-
-func cleanHandler(data *ServiceData) gue.WorkFunc {
-	return func(ctx context.Context, j *gue.Job) error {
-		var m messages.ASRMessage
-		if err := json.Unmarshal(j.Args, &m); err != nil {
-			return fmt.Errorf("could not unmarshal message: %w", err)
-		}
-		goapp.Log.Info().Str("id", m.ID).Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("got msg")
-		if j.ErrorCount > 2 {
-			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
-			return nil
-		}
-		return handleClean(ctx, &m, data)
+		return hf(ctx, &m, data)
 	}
 }
 
@@ -250,7 +220,7 @@ func handleClean(ctx context.Context, m *messages.ASRMessage, data *ServiceData)
 	goapp.Log.Info().Str("ID", m.ID).Msg("handling")
 	err := data.Transcriber.Clean(ctx, m.ID)
 	if err != nil {
-		return fmt.Errorf("can't get clean external data: %w", err)
+		return fmt.Errorf("can't clean external data: %w", err)
 	}
 	return nil
 }
