@@ -70,38 +70,55 @@ func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.Stat
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't dial to status URL: %w", err)
 	}
+	closeCtx, cf := context.WithCancel(ctx)
+	readyCloceCh := make(chan struct{}, 1)
 	resF := func() {
-		if err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
-			goapp.Log.Error().Err(err).Msg("socker write error")
+		cf()
+		select {
+		case <-readyCloceCh:
+		case <-time.After(time.Second * 5):
 		}
 		if err = c.Close(); err != nil {
 			goapp.Log.Error().Err(err).Msg("socker close error")
 		}
 	}
-	res := make(chan tapi.StatusData, 5)
-
+	res := make(chan tapi.StatusData, 2)
 	go func() {
 		defer close(res)
+		goapp.Log.Info().Str("ID", ID).Msg("enter status ws read loop")
 		for {
-			err := c.WriteMessage(websocket.TextMessage, []byte(ID))
-			if err != nil {
-				goapp.Log.Error().Err(err).Msg("socker write error")
-				return
-			}
+			goapp.Log.Info().Str("ID", ID).Msg("before read")
 			_, message, err := c.ReadMessage()
+			goapp.Log.Info().Str("ID", ID).Str("data", string(message)).Msg("after read")
 			if err != nil {
-				goapp.Log.Error().Err(err).Msg("socker read error")
-				return
+				goapp.Log.Warn().Err(err).Msg("socker read error")
+				break
 			}
 			var respData tapi.StatusData
 			err = json.Unmarshal(message, &respData)
 			if err != nil {
 				goapp.Log.Error().Err(err).Msg("can't unmarshal status data")
-				return
+				break
 			}
 			goapp.Log.Debug().Str("ID", ID).Str("data", string(message)).Msg("received status data")
 			res <- respData
 		}
+		goapp.Log.Info().Str("ID", ID).Msg("exit status ws read loop")
+	}()
+	go func() {
+		goapp.Log.Info().Str("ID", ID).Msg("before write ID")
+		err := c.WriteMessage(websocket.TextMessage, []byte(ID))
+		if err != nil {
+			goapp.Log.Error().Err(err).Msg("socker write error")
+			return
+		}
+		goapp.Log.Info().Str("ID", ID).Msg("wrote ID")
+		<-closeCtx.Done()
+		if err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+			goapp.Log.Error().Err(err).Msg("socker write error")
+		}
+		readyCloceCh <- struct{}{}
+		goapp.Log.Info().Str("ID", ID).Msg("exit write routine")
 	}()
 	return res, resF, nil
 }
