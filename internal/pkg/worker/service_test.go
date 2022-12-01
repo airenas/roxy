@@ -34,7 +34,7 @@ func initTest(t *testing.T) {
 
 func Test_handleClean(t *testing.T) {
 	initTest(t)
-	err := handleClean(testCtx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
+	err := handleClean(testCtx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
 	assert.Nil(t, err)
 }
 
@@ -42,7 +42,7 @@ func Test_handleClean_Fail(t *testing.T) {
 	initTest(t)
 	transcriberMock.ExpectedCalls = nil
 	transcriberMock.On("Clean", mock.Anything, mock.Anything).Return(fmt.Errorf("olia err"))
-	err := handleClean(testCtx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
+	err := handleClean(testCtx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
 	assert.NotNil(t, err)
 }
 
