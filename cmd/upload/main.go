@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/airenas/async-api/pkg/miniofs"
 	"github.com/airenas/go-app/pkg/goapp"
@@ -27,19 +26,19 @@ func main() {
 
 	dbConfig, err := pgxpool.ParseConfig(cfg.GetString("db.url"))
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 	addDBLog(dbConfig)
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 	defer dbPool.Close()
 
 	db, err := postgres.NewDB(dbPool)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db")
 	}
 
 	data.DBSaver = db
@@ -47,17 +46,17 @@ func main() {
 	data.Saver, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
 		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init file saver: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init file saver")
 	}
 
 	data.MsgSender, err = postgres.NewSender(dbPool)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init gue sender: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")
 	}
 
 	err = upload.StartWebServer(data)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't start web server: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't start web server")
 	}
 }
 

@@ -18,16 +18,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type config struct {
-	uploadURL  string
-	statusURL  string
-	dbURL      string
-	httpclient *http.Client
+	uploadURL          string
+	statusURL          string
+	statusSubscribeURL string
+	dbURL              string
+	httpclient         *http.Client
 }
 
 var cfg config
@@ -35,6 +38,7 @@ var cfg config
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
 	cfg.statusURL = GetEnvOrFail("STATUS_URL")
+	cfg.statusSubscribeURL = GetEnvOrFail("STATUS_SUBSCRIBE_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
 
@@ -130,6 +134,45 @@ func TestStatus_Check(t *testing.T) {
 	}
 }
 
+func TestStatus_Subscribe(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
+		{"numberOfSpeakers", "1"}})
+	resp := Invoke(t, cfg.httpclient, req)
+	CheckCode(t, resp, http.StatusOK)
+	var ur uploadResponse
+	Decode(t, resp, &ur)
+	assert.NotEmpty(t, ur.ID)
+	st := getStatus(t, ur.ID)
+	assert.NotEqual(t, "NOT_FOUND", st.Status)
+	dur := time.Second * 60
+	tm := time.After(dur)
+	r, cf := getStatusSubscribe(t, ur.ID)
+	defer cf()
+	for {
+		select {
+		case <-tm:
+			require.Failf(t, "Fail", "Not COMPLETED in %v", dur)
+		case st, cl := <-r:
+			require.Truef(t, cl, "Closed subscribe channel")
+			log.Printf("got status: %s", st.Status)
+			if st.Status == "COMPLETED" {
+				return
+			}
+		}
+	}
+}
+
+func getStatusSubscribe(t *testing.T, id string) (<-chan api.StatusData, func()) {
+	t.Helper()
+	client, _ := transcriber.NewClient(cfg.uploadURL, cfg.statusSubscribeURL, cfg.uploadURL, cfg.uploadURL)
+	tCtx, cf := context.WithTimeout(context.Background(), time.Second*20)
+	t.Cleanup(func() { cf() })
+	r, ccf, err := client.HookToStatus(tCtx, id)
+	require.Nil(t, err)
+	return r, ccf
+}
+
 func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Request {
 	t.Helper()
 	body := &bytes.Buffer{}
@@ -165,8 +208,23 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 		case "/ausis/transcriber/upload":
 			io.Copy(w, strings.NewReader(`{"id":"1111"}`))
 		case "/ausis/status.service/subscribe":
-			handleStatusWS(w, r, func() string {
-				return `{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"]}`
+			handleStatusWS(w, r, func(c *websocket.Conn) {
+				mt, _, err := c.ReadMessage()
+				if err != nil {
+					log.Print(err)
+					return
+				}
+				err = c.WriteMessage(mt, []byte(`{"status":"Decode", "audioReady":true, "avResults":["lat.txt", "res.txt"]}`))
+				if err != nil {
+					log.Print(err)
+					return
+				}
+				time.Sleep(1 * time.Second)
+				err = c.WriteMessage(mt, []byte(`{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"]}`))
+				if err != nil {
+					log.Print(err)
+					return
+				}
 			})
 		case "/ausis/result.service/result/1111/lat.txt":
 			w.Header().Add("content-disposition", `attachment; filename="lat123.txt"`)

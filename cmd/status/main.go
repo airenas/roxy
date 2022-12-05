@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/statusservice"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
+	"github.com/vgarvardt/gue/v5"
+	"github.com/vgarvardt/gue/v5/adapter/pgxv5"
 )
 
 func main() {
@@ -25,25 +27,51 @@ func main() {
 
 	dbConfig, err := pgxpool.ParseConfig(cfg.GetString("db.url"))
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db pool: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 	defer dbPool.Close()
 
 	db, err := postgres.NewDB(dbPool)
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't init db: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init db")
 	}
 
 	data.DB = db
+	wsh := statusservice.NewWSConnKeeper()
+	data.WSHandler = wsh
 
-	err = statusservice.StartWebServer(data)
+	hData := &statusservice.HandlerData{}
+	hData.DB = db
+	hData.WorkerCount = 3
+	hData.WSHandler = wsh
+	hData.GueClient, err = gue.NewClient(pgxv5.NewConnPool(dbPool))
 	if err != nil {
-		goapp.Log.Fatal().Err(fmt.Errorf("can't start web server: %w", err))
+		goapp.Log.Fatal().Err(err).Msg("can't init gue")
+	}
+
+	goapp.Log.Info().Msg("starting handler")
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	doneCh, err := statusservice.StartStatusHandler(ctx, hData)
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't start status handler service")
+	}
+
+	goapp.Log.Info().Msg("starting web service")
+	if err := statusservice.StartWebServer(data); err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't start web server")
+	}
+	goapp.Log.Info().Msg("exit web service")
+	cancelFunc()
+	select {
+	case <-doneCh:
+		goapp.Log.Info().Msg("All code returned. Now exit. Bye")
+	case <-time.After(time.Second * 15):
+		goapp.Log.Warn().Msg("Timeout gracefull shutdown")
 	}
 }
 

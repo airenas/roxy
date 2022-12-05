@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/facebookgo/grace/gracehttp"
+	"github.com/gorilla/websocket"
 
 	"github.com/airenas/roxy/internal/pkg/persistence"
 
@@ -24,10 +25,16 @@ type DB interface {
 	LoadStatus(ctx context.Context, id string) (*persistence.Status, error)
 }
 
+type WSConnHandler interface {
+	HandleConnection(WsConn) error
+	GetConnections(id string) ([]WsConn, bool)
+}
+
 // Data keeps data required for service work
 type Data struct {
-	Port int
-	DB   DB
+	Port     int
+	DB       DB
+	WSHandler WSConnHandler
 }
 
 // StartWebServer starts echo web service
@@ -64,6 +71,7 @@ func initRoutes(data *Data) *echo.Echo {
 
 	e.GET("/status/:id", statusHandler(data))
 	e.GET("/live", live(data))
+	e.GET("/subscribe", subscribeHandler(data))
 
 	goapp.Log.Info().Msg("Routes:")
 	for _, r := range e.Routes() {
@@ -119,5 +127,26 @@ func validate(data *Data) error {
 	if data.DB == nil {
 		return fmt.Errorf("no DB")
 	}
+	if data.WSHandler == nil {
+		return fmt.Errorf("no WSHandler")
+	}
 	return nil
+}
+
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	}}
+
+func subscribeHandler(data *Data) func(echo.Context) error {
+	return func(c echo.Context) error {
+		ws, err := wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
+		if err != nil {
+			goapp.Log.Error().Err(err).Send()
+			return err
+		}
+		defer ws.Close()
+
+		return data.WSHandler.HandleConnection(ws)
+	}
 }

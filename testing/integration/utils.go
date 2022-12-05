@@ -123,21 +123,12 @@ func waitForDB(ctx context.Context, URL string) {
 	}
 }
 
-func handleStatusWS(rw http.ResponseWriter, req *http.Request, rf func() string) {
+func handleStatusWS(rw http.ResponseWriter, req *http.Request, connf func(*websocket.Conn)) {
 	upgrader := websocket.Upgrader{}
 	c, err := upgrader.Upgrade(rw, req, nil)
 	if err != nil {
 		return
 	}
 	defer c.Close()
-	for {
-		mt, _, err := c.ReadMessage()
-		if err != nil {
-			break
-		}
-		err = c.WriteMessage(mt, []byte(rf()))
-		if err != nil {
-			break
-		}
-	}
+	connf(c)
 }

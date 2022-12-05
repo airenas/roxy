@@ -3,7 +3,6 @@ package worker
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
+	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/vgarvardt/gue/v5"
 )
 
@@ -34,11 +34,6 @@ type DB interface {
 type Filer interface {
 	LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error)
 	SaveFile(ctx context.Context, name string, r io.Reader) error
-}
-
-// StatusSaver persists data to DB
-type StatusSaver interface {
-	Save(ID string, status, err string) error
 }
 
 // Transcriber provides transcription
@@ -75,15 +70,15 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Upload: createHandler(data, handleASR),
-		wrkStatusQueue:  createHandler(data, handleStatus),
-		wrkStatusClean:  createHandler(data, handleClean),
+		messages.Upload: utils.CreateHandler(data, handleASR),
+		wrkStatusQueue:  utils.CreateHandler(data, handleStatus),
+		wrkStatusClean:  utils.CreateHandler(data, handleClean),
 	}
 
 	pool, err := gue.NewWorkerPool(
 		data.GueClient, wm, data.WorkerCount,
 		gue.WithPoolQueue(messages.Upload),
-		gue.WithPoolLogger(newGueLoggerAdapter()),
+		gue.WithPoolLogger(utils.NewGueLoggerAdapter()),
 		gue.WithPoolPollInterval(500*time.Millisecond),
 		gue.WithPoolPollStrategy(gue.RunAtPollStrategy),
 		gue.WithPoolID("asr-worker"),
@@ -101,21 +96,6 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 		res <- struct{}{}
 	}()
 	return res, nil
-}
-
-func createHandler[TM amessages.Message](data *ServiceData, hf func(context.Context, *TM, *ServiceData) error) gue.WorkFunc {
-	return func(ctx context.Context, j *gue.Job) error {
-		var m TM
-		if err := json.Unmarshal(j.Args, &m); err != nil {
-			return fmt.Errorf("could not unmarshal message: %w", err)
-		}
-		goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("got msg")
-		if j.ErrorCount > 2 {
-			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
-			return nil
-		}
-		return hf(ctx, &m, data)
-	}
 }
 
 func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
