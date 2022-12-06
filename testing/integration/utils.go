@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -75,27 +74,6 @@ func NewRequest(t *testing.T, method string, srv, urlSuffix string, body interfa
 func ToReader(data interface{}) io.Reader {
 	bytes, _ := json.Marshal(data)
 	return strings.NewReader(string(bytes))
-}
-
-func Invoke(t *testing.T, cl *http.Client, r *http.Request) *http.Response {
-	t.Helper()
-	resp, err := cl.Do(r)
-	require.Nil(t, err, "not nil error = %v", err)
-	t.Cleanup(func() { resp.Body.Close() })
-	return resp
-}
-
-func CheckCode(t *testing.T, resp *http.Response, expected int) {
-	t.Helper()
-	if resp.StatusCode != expected {
-		b, _ := ioutil.ReadAll(resp.Body)
-		require.Equal(t, expected, resp.StatusCode, string(b))
-	}
-}
-
-func Decode(t *testing.T, resp *http.Response, to interface{}) {
-	t.Helper()
-	require.Nil(t, json.NewDecoder(resp.Body).Decode(to))
 }
 
 func waitForDB(ctx context.Context, URL string) {

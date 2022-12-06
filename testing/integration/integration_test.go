@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/gorilla/websocket"
@@ -59,33 +60,33 @@ func TestMain(m *testing.M) {
 
 func TestUploadLive(t *testing.T) {
 	t.Parallel()
-	CheckCode(t, Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.uploadURL, "/live", nil)), http.StatusOK)
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.uploadURL, "/live", nil)), http.StatusOK)
 }
 
 func TestUpload(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
-	CheckCode(t, Invoke(t, cfg.httpclient, req), http.StatusOK)
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, req), http.StatusOK)
 }
 
 func TestUpload_SeveralFiles(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav", "audio2.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
-	CheckCode(t, Invoke(t, cfg.httpclient, req), http.StatusOK)
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, req), http.StatusOK)
 }
 
 func TestUpload_Fail_NoFile(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
-	CheckCode(t, Invoke(t, cfg.httpclient, req), http.StatusBadRequest)
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, req), http.StatusBadRequest)
 }
 
 func TestStatusLive(t *testing.T) {
 	t.Parallel()
-	CheckCode(t, Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "/live", nil)), http.StatusOK)
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "/live", nil)), http.StatusOK)
 }
 
 func TestStatus_Check_None(t *testing.T) {
@@ -100,21 +101,18 @@ type uploadResponse struct {
 }
 
 func getStatus(t *testing.T, id string) api.StatusData {
-	resp := Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+id, nil))
-	CheckCode(t, resp, http.StatusOK)
-	var st api.StatusData
-	Decode(t, resp, &st)
-	return st
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.statusURL, "status/"+id, nil))
+	test.CheckCode(t, resp, http.StatusOK)
+	return test.Decode[api.StatusData](t, resp)
 }
 
 func TestStatus_Check(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
-	resp := Invoke(t, cfg.httpclient, req)
-	CheckCode(t, resp, http.StatusOK)
-	var ur uploadResponse
-	Decode(t, resp, &ur)
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[api.StatusData](t, resp)
 	assert.NotEmpty(t, ur.ID)
 	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
@@ -138,10 +136,9 @@ func TestStatus_Subscribe(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
-	resp := Invoke(t, cfg.httpclient, req)
-	CheckCode(t, resp, http.StatusOK)
-	var ur uploadResponse
-	Decode(t, resp, &ur)
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	var ur = test.Decode[uploadResponse](t, resp)
 	assert.NotEmpty(t, ur.ID)
 	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
