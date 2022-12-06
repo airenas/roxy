@@ -3,7 +3,6 @@ package transcriber
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,7 +35,7 @@ func newTestR(code int, resp string) testResp {
 }
 
 func newTestReq(req *http.Request) testReq {
-	b, _ := ioutil.ReadAll(req.Body)
+	b, _ := io.ReadAll(req.Body)
 	return testReq{URL: req.URL.String(), resp: string(b)}
 }
 
@@ -54,7 +53,7 @@ func initTestServer(t *testing.T, rData map[string]testResp) (*Client, *httptest
 				rw.Header().Set(k, v)
 			}
 			rw.WriteHeader(resp.code)
-			rw.Write([]byte(resp.resp))
+			_, _ = rw.Write([]byte(resp.resp))
 		}
 	}))
 	// Use Client & URL from our local test server

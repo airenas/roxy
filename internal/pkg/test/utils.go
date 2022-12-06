@@ -3,7 +3,6 @@ package test
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -26,7 +25,7 @@ func Invoke(t *testing.T, cl *http.Client, r *http.Request) *http.Response {
 func CheckCode(t *testing.T, resp *http.Response, expected int) *http.Response {
 	t.Helper()
 	if resp.StatusCode != expected {
-		b, _ := ioutil.ReadAll(resp.Body)
+		b, _ := io.ReadAll(resp.Body)
 		require.Equal(t, expected, resp.StatusCode, string(b))
 	}
 	return resp

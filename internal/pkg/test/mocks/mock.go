@@ -18,6 +18,7 @@ func (m *Filer) SaveFile(ctx context.Context, name string, r io.Reader) error {
 	return args.Error(0)
 }
 
+// LoadFile func mock
 func (m *Filer) LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error) {
 	args := m.Called(ctx, fileName)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
@@ -26,11 +27,13 @@ func (m *Filer) LoadFile(ctx context.Context, fileName string) (io.ReadCloser, e
 // DB is postgress DB mock
 type DB struct{ mock.Mock }
 
+// LoadFile func mock
 func (m *DB) InsertRequest(ctx context.Context, req *persistence.ReqData) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)
 }
 
+// LoadFile func mock
 func (m *DB) InsertStatus(ctx context.Context, req *persistence.Status) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)

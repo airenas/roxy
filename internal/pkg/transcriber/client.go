@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -155,7 +154,7 @@ func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, e
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
 			return nil, isRetryableCode(resp.StatusCode), err
 		}
-		br, err := ioutil.ReadAll(resp.Body)
+		br, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, isRetryable(err), fmt.Errorf("can't read body: %w", err)
 		}
@@ -198,7 +197,9 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 		}
 	}
 	for v, k := range audio.Params {
-		writer.WriteField(v, k)
+		if err := writer.WriteField(v, k); err != nil {
+			return "", fmt.Errorf("can't add param: %w", err)
+		}
 	}
 	writer.Close()
 
@@ -226,7 +227,7 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
 			return "", isRetryableCode(resp.StatusCode), err
 		}
-		br, err := ioutil.ReadAll(resp.Body)
+		br, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "", isRetryable(err), fmt.Errorf("can't read body: %w", err)
 		}

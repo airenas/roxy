@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -61,7 +60,7 @@ func Test_Returns(t *testing.T) {
 	initTest(t)
 	req := newTestRequest("file", "file.wav", "olia", nil)
 	resp := testCode(t, req, 200)
-	bytes, _ := ioutil.ReadAll(resp.Body)
+	bytes, _ := io.ReadAll(resp.Body)
 	assert.Contains(t, string(bytes), `"id":"`)
 	require.Equal(t, len(senderMock.Calls), 1)
 }
@@ -165,7 +164,7 @@ func newTestRequest(filep, file, bodyText string, params [][2]string) *http.Requ
 		_, _ = io.Copy(part, strings.NewReader(bodyText))
 	}
 	for _, p := range params {
-		writer.WriteField(p[0], p[1])
+		_ = writer.WriteField(p[0], p[1])
 	}
 	writer.Close()
 	req := httptest.NewRequest("POST", "/upload", body)

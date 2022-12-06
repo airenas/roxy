@@ -219,7 +219,7 @@ func extractRequestID(header http.Header) string {
 
 func cleanFiles(f *multipart.Form) {
 	if f != nil {
-		f.RemoveAll()
+		_ = f.RemoveAll()
 	}
 }
 
