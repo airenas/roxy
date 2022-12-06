@@ -16,7 +16,8 @@ services:
     image: airenas/roxy-status:${status_version}
     restart: on-failure
     environment:
-      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable    
+      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
+      - WORKER_COUNT=1    
 
 
   worker:

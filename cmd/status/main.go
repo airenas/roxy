@@ -47,7 +47,7 @@ func main() {
 
 	hData := &statusservice.HandlerData{}
 	hData.DB = db
-	hData.WorkerCount = 3
+	hData.WorkerCount = cfg.GetInt("worker.count")
 	hData.WSHandler = wsh
 	hData.GueClient, err = gue.NewClient(pgxv5.NewConnPool(dbPool))
 	if err != nil {

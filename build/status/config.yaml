@@ -2,3 +2,6 @@ port: 8000
 
 # db:
     # url: postgres://roxy:---@localhost:5433/asr?sslmode=disable  
+
+worker:
+    count: 3
