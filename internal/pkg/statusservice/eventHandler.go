@@ -12,12 +12,12 @@ import (
 	"github.com/vgarvardt/gue/v5"
 )
 
-// DB provides persistnce functionality
+// StatusDB provides persistance functionality
 type StatusDB interface {
 	LoadStatus(ctx context.Context, id string) (*persistence.Status, error)
 }
 
-// ServiceData keeps data required for service work
+// HandlerData keeps data required for handler
 type HandlerData struct {
 	GueClient   *gue.Client
 	WorkerCount int

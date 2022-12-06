@@ -6,10 +6,12 @@ import (
 	"github.com/vgarvardt/gue/v5/adapter"
 )
 
+// GueLogAdapter implementation
 type GueLogAdapter struct {
 	fields []adapter.Field
 }
 
+// NewGueLoggerAdapter creates new instance
 func NewGueLoggerAdapter() *GueLogAdapter {
 	return &GueLogAdapter{}
 }

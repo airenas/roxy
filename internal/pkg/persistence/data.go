@@ -18,7 +18,7 @@ type (
 		RequestID string
 	}
 
-	//ReqData table
+	//WorkData table
 	WorkData struct {
 		ID         string
 		ExternalID string

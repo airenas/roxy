@@ -13,12 +13,14 @@ type WsConn interface {
 	WriteJSON(v interface{}) error
 }
 
+// WSConnKeeper implements connection management
 type WSConnKeeper struct {
 	idConnectionMap map[string]map[WsConn]struct{}
 	connectionIDMap map[WsConn]string
 	mapLock         *sync.Mutex
 }
 
+// NewWSConnKeeper creates manager
 func NewWSConnKeeper() *WSConnKeeper {
 	res := &WSConnKeeper{}
 	res.idConnectionMap = make(map[string]map[WsConn]struct{})
@@ -27,6 +29,7 @@ func NewWSConnKeeper() *WSConnKeeper {
 	return res
 }
 
+// HandleConnection loops until connection active and save connection with provided ID as key
 func (kp *WSConnKeeper) HandleConnection(conn WsConn) error {
 	defer kp.deleteConnection(conn)
 	defer conn.Close()
@@ -81,6 +84,7 @@ func (kp *WSConnKeeper) saveConnection(conn WsConn, id string) {
 	goapp.Log.Info().Msgf("saveConnection finish: %d", len(kp.connectionIDMap))
 }
 
+// GetConnections returns saved connections by provided id
 func (kp *WSConnKeeper) GetConnections(id string) ([]WsConn, bool) {
 	cm, found := kp.idConnectionMap[id]
 	if found {

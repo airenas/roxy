@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Invoke makes a request call
 func Invoke(t *testing.T, cl *http.Client, r *http.Request) *http.Response {
 	t.Helper()
 	resp, err := cl.Do(r)
@@ -21,6 +22,7 @@ func Invoke(t *testing.T, cl *http.Client, r *http.Request) *http.Response {
 	return resp
 }
 
+// CheckCode checks response code
 func CheckCode(t *testing.T, resp *http.Response, expected int) *http.Response {
 	t.Helper()
 	if resp.StatusCode != expected {
@@ -30,6 +32,7 @@ func CheckCode(t *testing.T, resp *http.Response, expected int) *http.Response {
 	return resp
 }
 
+// Decode decodes response body to json type
 func Decode[T any](t *testing.T, resp *http.Response) T {
 	t.Helper()
 	var res T

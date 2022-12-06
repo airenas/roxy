@@ -118,11 +118,11 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 		return fmt.Errorf("can't load work data: %w", err)
 	}
 	if wd == nil {
-		extId, err := upload(ctx, req, data)
+		extID, err := upload(ctx, req, data)
 		if err != nil {
 			return fmt.Errorf("can't upload: %w", err)
 		}
-		wd = &persistence.WorkData{ID: req.ID, ExternalID: extId, Created: time.Now()}
+		wd = &persistence.WorkData{ID: req.ID, ExternalID: extID, Created: time.Now()}
 		err = data.DB.InsertWorkData(ctx, wd)
 		if err != nil {
 			return fmt.Errorf("can't save work data: %w", err)

@@ -25,6 +25,7 @@ type DB interface {
 	LoadStatus(ctx context.Context, id string) (*persistence.Status, error)
 }
 
+// WSConnHandler WwbSocketConnection wrapper
 type WSConnHandler interface {
 	HandleConnection(WsConn) error
 	GetConnections(id string) ([]WsConn, bool)

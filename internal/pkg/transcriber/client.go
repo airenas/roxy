@@ -60,7 +60,7 @@ func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error
 	return &res, nil
 }
 
-// GetStatus get status from the server
+// HookToStatus to status ws
 func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error) {
 	goapp.Log.Info().Str("url", sp.statusURL).Str("ID", ID).Msg("connect")
 	c, err := invokeWithBackoff(ctx, func() (*websocket.Conn, bool, error) {

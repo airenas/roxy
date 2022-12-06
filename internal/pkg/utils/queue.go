@@ -9,6 +9,7 @@ import (
 	"github.com/vgarvardt/gue/v5"
 )
 
+// CreateHandler helper func to wrapp gue worker main func
 func CreateHandler[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error) gue.WorkFunc {
 	return func(ctx context.Context, j *gue.Job) error {
 		var m TM
