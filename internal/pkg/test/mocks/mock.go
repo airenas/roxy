@@ -19,9 +19,9 @@ func (m *Filer) SaveFile(ctx context.Context, name string, r io.Reader) error {
 }
 
 // LoadFile func mock
-func (m *Filer) LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error) {
+func (m *Filer) LoadFile(ctx context.Context, fileName string) (io.ReadSeekCloser, error) {
 	args := m.Called(ctx, fileName)
-	return args.Get(0).(io.ReadCloser), args.Error(1)
+	return args.Get(0).(io.ReadSeekCloser), args.Error(1)
 }
 
 // DB is postgress DB mock

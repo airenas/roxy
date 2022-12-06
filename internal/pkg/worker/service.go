@@ -32,7 +32,7 @@ type DB interface {
 
 // Filer retrieves files
 type Filer interface {
-	LoadFile(ctx context.Context, fileName string) (io.ReadCloser, error)
+	LoadFile(ctx context.Context, fileName string) (io.ReadSeekCloser, error)
 	SaveFile(ctx context.Context, name string, r io.Reader) error
 }
 
