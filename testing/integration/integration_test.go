@@ -163,9 +163,7 @@ func TestStatus_Subscribe(t *testing.T) {
 func getStatusSubscribe(t *testing.T, id string) (<-chan api.StatusData, func()) {
 	t.Helper()
 	client, _ := transcriber.NewClient(cfg.uploadURL, cfg.statusSubscribeURL, cfg.uploadURL, cfg.uploadURL)
-	tCtx, cf := context.WithTimeout(context.Background(), time.Second*20)
-	t.Cleanup(func() { cf() })
-	r, ccf, err := client.HookToStatus(tCtx, id)
+	r, ccf, err := client.HookToStatus(test.Ctx(t), id)
 	require.Nil(t, err)
 	return r, ccf
 }
