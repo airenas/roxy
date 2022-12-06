@@ -86,6 +86,8 @@ func (kp *WSConnKeeper) saveConnection(conn WsConn, id string) {
 
 // GetConnections returns saved connections by provided id
 func (kp *WSConnKeeper) GetConnections(id string) ([]WsConn, bool) {
+	kp.mapLock.Lock()
+	defer kp.mapLock.Unlock()
 	cm, found := kp.idConnectionMap[id]
 	if found {
 		res := []WsConn{}

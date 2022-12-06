@@ -119,5 +119,8 @@ func (m *mockWSConnHandler) HandleConnection(wc WsConn) error {
 
 func (m *mockWSConnHandler) GetConnections(id string) ([]WsConn, bool) {
 	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1)
+	}
 	return args.Get(0).([]WsConn), args.Bool(1)
 }

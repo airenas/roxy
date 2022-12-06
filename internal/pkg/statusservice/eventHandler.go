@@ -106,5 +106,8 @@ func validateHandler(data *HandlerData) error {
 	if data.DB == nil {
 		return fmt.Errorf("no DB")
 	}
+	if data.WSHandler == nil {
+		return fmt.Errorf("no WSHandler")
+	}
 	return nil
 }

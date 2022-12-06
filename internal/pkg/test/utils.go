@@ -1,10 +1,12 @@
 package test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -37,4 +39,11 @@ func Decode[T any](t *testing.T, resp *http.Response) T {
 	var res T
 	require.Nil(t, json.NewDecoder(resp.Body).Decode(&res))
 	return res
+}
+
+func Ctx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cf := context.WithTimeout(context.Background(), time.Second*20)
+	t.Cleanup(func() { cf() })
+	return ctx
 }
