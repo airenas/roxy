@@ -26,9 +26,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	latFileContent   = "lat file content 1"
+	resFileContent   = "res file content 1"
+	audioFileContent = "audio.wav content"
+)
+
 type config struct {
 	uploadURL          string
 	statusURL          string
+	resultURL          string
 	statusSubscribeURL string
 	dbURL              string
 	httpclient         *http.Client
@@ -39,6 +46,7 @@ var cfg config
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
 	cfg.statusURL = GetEnvOrFail("STATUS_URL")
+	cfg.resultURL = GetEnvOrFail("RESULT_URL")
 	cfg.statusSubscribeURL = GetEnvOrFail("STATUS_SUBSCRIBE_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
@@ -48,6 +56,7 @@ func TestMain(m *testing.M) {
 	WaitForOpenOrFail(tCtx, cfg.dbURL)
 	WaitForOpenOrFail(tCtx, cfg.uploadURL)
 	WaitForOpenOrFail(tCtx, cfg.statusURL)
+	WaitForOpenOrFail(tCtx, cfg.resultURL)
 	waitForDB(tCtx, cfg.dbURL)
 
 	//start mocks service for private services - not in this docker compose
@@ -116,6 +125,10 @@ func TestStatus_Check(t *testing.T) {
 	assert.NotEmpty(t, ur.ID)
 	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
+	testWaitCompleted(t, ur.ID)
+}
+
+func testWaitCompleted(t *testing.T, id string) {
 	dur := time.Second * 60
 	tm := time.After(dur)
 	for {
@@ -123,7 +136,7 @@ func TestStatus_Check(t *testing.T) {
 		case <-tm:
 			require.Failf(t, "Fail", "Not COMPLETED in %v", dur)
 		default:
-			st = getStatus(t, ur.ID)
+			st := getStatus(t, id)
 			if st.Status == "COMPLETED" {
 				return
 			}
@@ -160,6 +173,94 @@ func TestStatus_Subscribe(t *testing.T) {
 	}
 }
 
+func TestResultLive(t *testing.T) {
+	t.Parallel()
+	test.CheckCode(t, test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, "/live", nil)), http.StatusOK)
+}
+
+func TestResult_NoFile(t *testing.T) {
+	t.Parallel()
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, "result/1xx/some.txt", nil))
+	test.CheckCode(t, resp, http.StatusBadRequest)
+}
+
+func TestResult_GetFile(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("result/%s/lat.txt", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, latFileContent, takeStr(resp))
+}
+
+func TestResult_GetFile2(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("result/%s/res.txt", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	assert.Equal(t, "attachment; filename=res.txt", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, resFileContent, takeStr(resp))
+}
+
+func takeStr(resp *http.Response) string{
+	var b bytes.Buffer
+	_, _ = b.ReadFrom(resp.Body)
+	return b.String()
+}
+
+func TestResult_Head(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodHead, cfg.resultURL, fmt.Sprintf("result/%s/lat.txt", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
+	var b bytes.Buffer
+	_, _ = b.ReadFrom(resp.Body)
+	assert.Equal(t, "", b.String())
+	assert.Equal(t, "", resp.Header)
+}
+
+func TestResult_Audio(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, audioFileContent, takeStr(resp))
+	assert.Equal(t, "", resp.Header)
+}
+
+func TestResult_AudioHead(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodHead, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, "audio.wav content", takeStr(resp))
+	assert.Equal(t, "", resp.Header)
+}
+
+func uploadWaitFakeFile(t *testing.T) string {
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[api.StatusData](t, resp)
+
+	testWaitCompleted(t, ur.ID)
+	return ur.ID
+}
+
 func getStatusSubscribe(t *testing.T, id string) (<-chan api.StatusData, func()) {
 	t.Helper()
 	client, _ := transcriber.NewClient(cfg.uploadURL, cfg.statusSubscribeURL, cfg.uploadURL, cfg.uploadURL)
@@ -178,7 +279,7 @@ func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Re
 			n = fmt.Sprintf("file%d", i+1)
 		}
 		part, _ := writer.CreateFormFile(n, f)
-		_, _ = io.Copy(part, strings.NewReader(f))
+		_, _ = io.Copy(part, strings.NewReader(audioFileContent))
 	}
 	for _, p := range params {
 		writer.WriteField(p[0], p[1])
@@ -222,11 +323,11 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 				}
 			})
 		case "/ausis/result.service/result/1111/lat.txt":
-			w.Header().Add("content-disposition", `attachment; filename="lat123.txt"`)
-			io.Copy(w, strings.NewReader(`file content`))
+			w.Header().Add("content-disposition", `attachment; filename="lat.txt"`)
+			io.Copy(w, strings.NewReader(latFileContent))
 		case "/ausis/result.service/result/1111/res.txt":
-			w.Header().Add("content-disposition", `attachment; filename="lat123res.txt"`)
-			io.Copy(w, strings.NewReader(`file content`))
+			w.Header().Add("content-disposition", `attachment; filename="res.txt"`)
+			io.Copy(w, strings.NewReader(resFileContent))
 		case "/ausis/clean.service/1111":
 			io.Copy(w, strings.NewReader(`OK`))
 		default:

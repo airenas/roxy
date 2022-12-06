@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -143,7 +144,7 @@ func serveFile(c echo.Context, data *Data, name string) error {
 	}
 
 	w := c.Response()
-	w.Header().Set("Content-Disposition", "attachment; filename="+stat.Name())
+	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(stat.Name()))
 	http.ServeContent(w, c.Request(), stat.Name(), stat.ModTime(), file)
 	return nil
 }
