@@ -42,7 +42,7 @@ func (m *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData, 
 }
 func (m *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(*persistence.Status), args.Error(1)
+	return to[persistence.Status](args.Get(0)), args.Error(1)
 }
 func (m *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error) {
 	args := m.Called(ctx, id)
@@ -91,4 +91,11 @@ func (m *Transcriber) GetResult(ctx context.Context, ID, name string) (*api.File
 func (m *Transcriber) Clean(ctx context.Context, ID string) error {
 	args := m.Called(ctx, ID)
 	return args.Error(0)
+}
+
+func to[T any](val interface{}) *T {
+	if val == nil {
+		return nil
+	}
+	return val.(*T)
 }
