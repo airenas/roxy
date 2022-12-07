@@ -38,8 +38,8 @@ cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3f
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/airenas/async-api v1.0.57 h1:TBkspcE14lPtMjCG9651pVMA7pbijMc3maISSQOiLU8=
-github.com/airenas/async-api v1.0.57/go.mod h1:SKJ/x2544XGEUmx+9dAK+ocOH2Ps0MAI81tbT0PynZo=
+github.com/airenas/async-api v1.0.58 h1:pcp8UiTEn1iGFe3lHtKTia3VcbI+C+jcTJMqNj4EWBM=
+github.com/airenas/async-api v1.0.58/go.mod h1:SKJ/x2544XGEUmx+9dAK+ocOH2Ps0MAI81tbT0PynZo=
 github.com/airenas/go-app v1.0.22 h1:oFr32ES8OAngAK1qHyG2z+QEbjVRm+Y53NeHOw+sqw0=
 github.com/airenas/go-app v1.0.22/go.mod h1:DEBaRkRejTK1cIL2lD6iwZBy6kE8HXEzb636eVkimiw=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
