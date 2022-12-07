@@ -2,7 +2,6 @@ package upload
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -11,8 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airenas/async-api/pkg/messages"
-	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/test/mocks"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,18 +18,18 @@ import (
 )
 
 var (
-	saverMock  *mockSaver
-	dbMock     *mockDB
-	senderMock *mockSender
+	saverMock  *mocks.Filer
+	dbMock     *mocks.DB
+	senderMock *mocks.Sender
 	tData      *Data
 	tEcho      *echo.Echo
 	tResp      *httptest.ResponseRecorder
 )
 
 func initTest(t *testing.T) {
-	saverMock = &mockSaver{}
-	dbMock = &mockDB{}
-	senderMock = &mockSender{}
+	saverMock = &mocks.Filer{}
+	dbMock = &mocks.DB{}
+	senderMock = &mocks.Sender{}
 	tData = &Data{}
 	tData.Saver = saverMock
 	tData.DBSaver = dbMock
@@ -176,30 +174,4 @@ func newTestRequest(filep, file, bodyText string, params [][2]string) *http.Requ
 func Test_extractRequestID(t *testing.T) {
 	req := newTestRequest("file", "file.wav", "olia", nil)
 	assert.Equal(t, "m:testRequestID", extractRequestID(req.Header))
-}
-
-type mockSaver struct{ mock.Mock }
-
-func (m *mockSaver) SaveFile(ctx context.Context, name string, r io.Reader) error {
-	args := m.Called(ctx, name, r)
-	return args.Error(0)
-}
-
-type mockDB struct{ mock.Mock }
-
-func (m *mockDB) InsertRequest(ctx context.Context, req *persistence.ReqData) error {
-	args := m.Called(ctx, req)
-	return args.Error(0)
-}
-
-func (m *mockDB) InsertStatus(ctx context.Context, req *persistence.Status) error {
-	args := m.Called(ctx, req)
-	return args.Error(0)
-}
-
-type mockSender struct{ mock.Mock }
-
-func (m *mockSender) SendMessage(ctx context.Context, msg messages.Message, queue string) error {
-	args := m.Called(ctx, msg, queue)
-	return args.Error(0)
 }

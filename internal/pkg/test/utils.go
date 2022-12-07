@@ -1,13 +1,16 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,4 +49,20 @@ func Ctx(t *testing.T) context.Context {
 	ctx, cf := context.WithTimeout(context.Background(), time.Second*20)
 	t.Cleanup(func() { cf() })
 	return ctx
+}
+
+func Code(t *testing.T, tEcho *echo.Echo, req *http.Request, code int) *httptest.ResponseRecorder {
+	t.Helper()
+	tResp := httptest.NewRecorder()
+	tEcho.ServeHTTP(tResp, req)
+	require.Equal(t, code, tResp.Code)
+	return tResp
+}
+
+func RStr(t *testing.T, r io.Reader) string {
+	t.Helper()
+	var b bytes.Buffer
+	_, err := b.ReadFrom(r)
+	require.Nil(t, err)
+	return b.String()
 }

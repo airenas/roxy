@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/facebookgo/grace/gracehttp"
+	"github.com/minio/minio-go/v7"
 	"github.com/pkg/errors"
 
 	"github.com/airenas/go-app/pkg/goapp"
@@ -128,6 +129,10 @@ func serveFile(c echo.Context, data *Data, name string) error {
 	goapp.Log.Info().Str("file", name).Msg("loading")
 	file, err := data.Reader.LoadFile(c.Request().Context(), name)
 	if err != nil {
+		if isNotFound(err) {
+			goapp.Log.Error().Err(err).Send()
+			return echo.NewHTTPError(http.StatusNotFound, "not found")
+		}
 		goapp.Log.Error().Err(err).Send()
 		return echo.NewHTTPError(http.StatusInternalServerError, "Can't get file")
 	}
@@ -139,6 +144,10 @@ func serveFile(c echo.Context, data *Data, name string) error {
 	}
 	stat, err := stGetter.Stat()
 	if err != nil {
+		if isNotFound(err) {
+			goapp.Log.Error().Err(err).Send()
+			return echo.NewHTTPError(http.StatusNotFound, "not found")
+		}
 		goapp.Log.Error().Err(err).Send()
 		return echo.NewHTTPError(http.StatusInternalServerError, "Can't get file stat")
 	}
@@ -147,6 +156,11 @@ func serveFile(c echo.Context, data *Data, name string) error {
 	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(stat.Name()))
 	http.ServeContent(w, c.Request(), stat.Name(), stat.ModTime(), file)
 	return nil
+}
+
+func isNotFound(err error) bool {
+	var errTest minio.ErrorResponse
+	return errors.As(err, &errTest) && errTest.StatusCode == http.StatusNotFound
 }
 
 func downloadAudio(data *Data) func(echo.Context) error {
