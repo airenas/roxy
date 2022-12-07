@@ -148,7 +148,7 @@ const emailLockValue = 1
 func (db *DB) LockEmailTable(ctx context.Context, ID string, key string) error {
 	goapp.Log.Info().Str("ID", ID).Str("key", key).Msg("locking")
 	_, err := db.pool.Exec(ctx, `INSERT INTO email_lock(id, key, value) 
-	VALUES($1, $2, $3) ON CONFLICT (id, type) DO NOTHING`, ID, key, 0)
+	VALUES($1, $2, $3) ON CONFLICT (id, key) DO NOTHING`, ID, key, 0)
 	if err != nil {
 		return fmt.Errorf("can't insert email_lock: %w", err)
 	}
