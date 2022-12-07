@@ -62,7 +62,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Int("workers", data.WorkerCount).Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Inform: utils.CreateHandler(data, handleInform),
+		messages.Inform: utils.CreateHandler(data, handleInform, nil),
 	}
 
 	pool, err := gue.NewWorkerPool(

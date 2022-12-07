@@ -71,9 +71,9 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Upload: utils.CreateHandler(data, handleASR),
-		wrkStatusQueue:  utils.CreateHandler(data, handleStatus),
-		wrkStatusClean:  utils.CreateHandler(data, handleClean),
+		messages.Upload: utils.CreateHandler(data, handleASR, data.MsgSender),
+		wrkStatusQueue:  utils.CreateHandler(data, handleStatus, data.MsgSender),
+		wrkStatusClean:  utils.CreateHandler(data, handleClean, nil),
 	}
 
 	pool, err := gue.NewWorkerPool(
@@ -194,6 +194,14 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 			wrkQueuePrefix+wrkStatusClean)
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
+		}
+		if m.Error == "" {
+			err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
+				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
+				Type:         amessages.InformTypeFinished, At: time.Now()}, messages.Inform)
+			if err != nil {
+				return fmt.Errorf("can't send msg: %w", err)
+			}
 		}
 	}
 	return nil
