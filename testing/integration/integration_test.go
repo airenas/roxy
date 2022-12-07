@@ -181,7 +181,7 @@ func TestResultLive(t *testing.T) {
 func TestResult_NoFile(t *testing.T) {
 	t.Parallel()
 	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, "result/1xx/some.txt", nil))
-	test.CheckCode(t, resp, http.StatusBadRequest)
+	test.CheckCode(t, resp, http.StatusNotFound)
 }
 
 func TestResult_GetFile(t *testing.T) {
@@ -206,7 +206,7 @@ func TestResult_GetFile2(t *testing.T) {
 	assert.Equal(t, resFileContent, takeStr(resp))
 }
 
-func takeStr(resp *http.Response) string{
+func takeStr(resp *http.Response) string {
 	var b bytes.Buffer
 	_, _ = b.ReadFrom(resp.Body)
 	return b.String()
@@ -215,15 +215,11 @@ func takeStr(resp *http.Response) string{
 func TestResult_Head(t *testing.T) {
 	t.Parallel()
 	id := uploadWaitFakeFile(t)
-
 	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodHead, cfg.resultURL, fmt.Sprintf("result/%s/lat.txt", id), nil))
 	test.CheckCode(t, resp, http.StatusOK)
 
 	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
-	var b bytes.Buffer
-	_, _ = b.ReadFrom(resp.Body)
-	assert.Equal(t, "", b.String())
-	assert.Equal(t, "", resp.Header)
+	assert.Equal(t, "", test.RStr(t, resp.Body))
 }
 
 func TestResult_Audio(t *testing.T) {
@@ -235,7 +231,6 @@ func TestResult_Audio(t *testing.T) {
 
 	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
 	assert.Equal(t, audioFileContent, takeStr(resp))
-	assert.Equal(t, "", resp.Header)
 }
 
 func TestResult_AudioHead(t *testing.T) {
@@ -247,7 +242,6 @@ func TestResult_AudioHead(t *testing.T) {
 
 	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
 	assert.Equal(t, "audio.wav content", takeStr(resp))
-	assert.Equal(t, "", resp.Header)
 }
 
 func uploadWaitFakeFile(t *testing.T) string {

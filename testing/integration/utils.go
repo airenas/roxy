@@ -72,6 +72,9 @@ func NewRequest(t *testing.T, method string, srv, urlSuffix string, body interfa
 }
 
 func ToReader(data interface{}) io.Reader {
+	if data == nil {
+		return nil
+	}
 	bytes, _ := json.Marshal(data)
 	return strings.NewReader(string(bytes))
 }
