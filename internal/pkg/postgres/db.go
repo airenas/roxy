@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -138,5 +139,45 @@ func (db *DB) Live(ctx context.Context) error {
 	if !exists {
 		return fmt.Errorf("no migration done")
 	}
+	return nil
+}
+
+const emailLockValue = 1
+
+// LockEmailTable inserts record to db and marks it as working
+func (db *DB) LockEmailTable(ctx context.Context, ID string, key string) error {
+	goapp.Log.Info().Str("ID", ID).Str("key", key).Msg("locking")
+	_, err := db.pool.Exec(ctx, `INSERT INTO email_lock(id, key, value) 
+	VALUES($1, $2, $3) ON CONFLICT (id, type) DO NOTHING`, ID, key, 0)
+	if err != nil {
+		return fmt.Errorf("can't insert email_lock: %w", err)
+	}
+
+	res, err := db.pool.Exec(ctx,
+		`UPDATE email_lock SET value = $4 WHERE id = $1 and key = $2 and value = $3`,
+		ID, key, 0, emailLockValue)
+	if err != nil {
+		return fmt.Errorf("can't update email_lock: %w", err)
+	}
+	if res.RowsAffected() != 1 {
+		return fmt.Errorf("can't lock email_lock, no records found")
+	}
+	goapp.Log.Info().Str("ID", ID).Str("key", key).Msg("locked")
+	return nil
+}
+
+// UnLockEmailTable replaces table status with value
+func (db *DB) UnLockEmailTable(ctx context.Context, ID string, key string, value *int) error {
+	goapp.Log.Info().Str("ID", ID).Str("key", key).Int("value", *value).Msg("unlocking")
+	res, err := db.pool.Exec(ctx,
+		`UPDATE email_lock SET value = $4 WHERE id = $1 and key = $2 and value = $3`,
+		ID, key, emailLockValue, *value)
+	if err != nil {
+		return fmt.Errorf("can't unlock email_lock: %w", err)
+	}
+	if res.RowsAffected() != 1 {
+		return fmt.Errorf("can't unlock email_lock, no records found")
+	}
+	goapp.Log.Info().Str("ID", ID).Str("key", key).Msg("unlocked")
 	return nil
 }
