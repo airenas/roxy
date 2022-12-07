@@ -24,8 +24,10 @@ func NewDB(pool *pgxpool.Pool) (*DB, error) {
 
 // InsertRequest inserts request into DB
 func (db *DB) InsertRequest(ctx context.Context, req *persistence.ReqData) error {
-	rows, err := db.pool.Query(ctx, `INSERT INTO requests(id, email, file_count, params, request_id, created) 
-	VALUES($1, $2, $3, $4, $5, $6)`, req.ID, req.Email, req.FileCount,
+	rows, err := db.pool.Query(ctx, `INSERT INTO requests(id, email, file_count, file_name, file_names, params, request_id, created) 
+	VALUES($1, $2, $3, $4, $5, $6, $7, $8)`, req.ID, req.Email, req.FileCount,
+		req.FileName,
+		req.FileNames,
 		req.Params,
 		req.RequestID,
 		req.Created,
@@ -40,8 +42,9 @@ func (db *DB) InsertRequest(ctx context.Context, req *persistence.ReqData) error
 // LoadRequest loads request from DB
 func (db *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error) {
 	var res persistence.ReqData
-	err := db.pool.QueryRow(ctx, `SELECT id, email, file_count, params, request_id, created FROM requests
-		WHERE id = $1`, id).Scan(&res.ID, &res.Email, &res.FileCount, &res.Params, &res.RequestID, &res.Created)
+	err := db.pool.QueryRow(ctx, `SELECT id, email, file_count, file_name, file_names, params, request_id, created FROM requests
+		WHERE id = $1`, id).Scan(&res.ID, &res.Email, &res.FileCount, &res.FileName, &res.FileNames,
+		&res.Params, &res.RequestID, &res.Created)
 	if err != nil {
 		return nil, fmt.Errorf("can't load reguest: %w", err)
 	}

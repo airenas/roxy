@@ -2,6 +2,7 @@ package upload
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -30,17 +31,17 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
-//FileSaver provides save file functionality
+// FileSaver provides save file functionality
 type FileSaver interface {
 	SaveFile(ctx context.Context, name string, r io.Reader) error
 }
 
-//MsgSender provides send msg functionality
+// MsgSender provides send msg functionality
 type MsgSender interface {
 	SendMessage(context.Context, amessages.Message, string) error
 }
 
-//DBSaver saves requests to DB
+// DBSaver saves requests to DB
 type DBSaver interface {
 	InsertRequest(ctx context.Context, req *persistence.ReqData) error
 	InsertStatus(ctx context.Context, req *persistence.Status) error
@@ -56,7 +57,7 @@ type Data struct {
 
 const requestIDHEader = "x-doorman-requestid"
 
-//StartWebServer starts echo web service
+// StartWebServer starts echo web service
 func StartWebServer(data *Data) error {
 	goapp.Log.Info().Msgf("Starting HTTP ROXY upload service at %d", data.Port)
 	if err := validate(data); err != nil {
@@ -148,24 +149,27 @@ func upload(data *Data) func(echo.Context) error {
 			return echo.NewHTTPError(http.StatusBadRequest, "wrong input form")
 		}
 
-		err = validateFiles(fHeaders)
+		rd := persistence.ReqData{}
+		rd.ID = uuid.New().String()
+		rd.FileNames, err = validateExtractFiles(fHeaders)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 
-		rd := persistence.ReqData{}
-		rd.ID = uuid.New().String()
 		rd.Created = time.Now()
 		rd.Email = c.FormValue(api.PrmEmail)
 		rd.FileCount = len(files)
 		rd.Params = takeParams(form)
-		rd.Filename = rd.ID + ".mp3"
+		rd.FileName = sql.NullString{String: rd.ID + ".mp3", Valid: true}
 		audioReady := false
 		if len(files) == 1 {
-			ext := filepath.Ext(fHeaders[0].Filename)
-			ext = strings.ToLower(ext)
-			rd.Filename = rd.ID + ext
+			rd.FileName = sql.NullString{String: rd.FileNames[0], Valid: true}
 			audioReady = true
+		}
+		err = saveFiles(ctx, data.Saver, rd.ID, files, fHeaders)
+		if err != nil {
+			goapp.Log.Error().Err(err).Send()
+			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
@@ -289,46 +293,34 @@ func takeFile(form *multipart.Form, paramName string) (multipart.File, *multipar
 	return file, handler, err
 }
 
-func validateFiles(fHeaders []*multipart.FileHeader) error {
+func validateExtractFiles(fHeaders []*multipart.FileHeader) ([]string, error) {
+	res := []string{}
 	for _, h := range fHeaders {
 		ext := filepath.Ext(h.Filename)
 		if !utils.SupportAudioExt(strings.ToLower(ext)) {
-			return errors.New("wrong file extension: " + ext)
+			return nil, fmt.Errorf("wrong file extension: " + ext)
 		}
-		if strings.Contains(h.Filename, "..") {
-			return errors.New("wrong file name: " + h.Filename)
+		fn, err := utils.MakeValidateFileName("", h.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("wrong file name: " + h.Filename)
 		}
+		res = append(res, fn)
 	}
-	return nil
+	return res, nil
 }
 
 func saveFiles(ctx context.Context, fs FileSaver, id string, files []multipart.File, fHeaders []*multipart.FileHeader) error {
-	if len(files) == 1 {
-		ext := filepath.Ext(fHeaders[0].Filename)
-		ext = strings.ToLower(ext)
-		return fs.SaveFile(ctx, id+ext, files[0])
-	}
-
 	for i, f := range files {
-		fn := fHeaders[i].Filename
-		if fn == "" {
+		if fHeaders[i].Filename == "" {
 			return errors.New("no file name in multipart")
 		}
-		fn = filepath.Join(id, sanitizeName(fn))
-		err := fs.SaveFile(ctx, toLowerExt(fn), f)
+		fn, err := utils.MakeValidateFileName(id, fHeaders[i].Filename)
 		if err != nil {
-			return errors.Wrapf(err, "can't save %s", fn)
+			return fmt.Errorf("can't save '%s': %w", fHeaders[i].Filename, err)
+		}
+		if err = fs.SaveFile(ctx, fn, f); err != nil {
+			return fmt.Errorf("can't save '%s': %w", fn, err)
 		}
 	}
 	return nil
-}
-
-func sanitizeName(s string) string {
-	res := strings.ReplaceAll(s, " ", "_")
-	return filepath.Base(res)
-}
-
-func toLowerExt(f string) string {
-	ext := filepath.Ext(f)
-	return f[:len(f)-len(ext)] + strings.ToLower(ext)
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	amessages "github.com/airenas/async-api/pkg/messages"
@@ -153,7 +154,8 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		if err != nil {
 			return fmt.Errorf("can't get audio: %w", err)
 		}
-		err = data.Filer.SaveFile(ctx, f.Name, bytes.NewReader(f.Content))
+		name := filepath.Join(m.ID, m.ID+".mp3") // only such case now supported
+		err = data.Filer.SaveFile(ctx, name, bytes.NewReader(f.Content))
 		if err != nil {
 			return fmt.Errorf("can't save file: %w", err)
 		}
@@ -259,15 +261,24 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, extID, ID s
 
 func upload(ctx context.Context, req *persistence.ReqData, data *ServiceData) (string, error) {
 	goapp.Log.Info().Str("ID", req.ID).Msg("load file")
-	file, err := data.Filer.LoadFile(ctx, req.ID+".wav")
-	_ = req
-	if err != nil {
-		return "", fmt.Errorf("can't load file: %w", err)
+	filesMap := map[string]io.Reader{}
+	files := []io.ReadCloser{}
+	defer func() {
+		for _, r := range files {
+			_ = r.Close()
+		}
+	}()
+	for _, f := range req.FileNames {
+		file, err := data.Filer.LoadFile(ctx, utils.MakeFileName(req.ID, f))
+		if err != nil {
+			return "", fmt.Errorf("can't load file: %w", err)
+		}
+		files = append(files, file)
+		filesMap[f] = file
+		goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
 	}
-	defer file.Close()
-	goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
 	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
-	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: req.Params, Files: map[string]io.Reader{req.ID + ".wav": file}})
+	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: req.Params, Files: filesMap})
 	if err != nil {
 		return "", fmt.Errorf("can't upload: %w", err)
 	}

@@ -1,6 +1,7 @@
 package result
 
 import (
+	"database/sql"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,8 @@ func initTest(t *testing.T) {
 	tEcho = initRoutes(tData)
 	filerMock.On("LoadFile", mock.Anything, "1/olia").Return(&testFileWrap{s: "olia", n: "res.txt"}, nil)
 	filerMock.On("LoadFile", mock.Anything, "1/1.wav").Return(&testFileWrap{s: "audio", n: "res.wav"}, nil)
-	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", Filename: "1.wav"}, nil)
+	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: sql.NullString{String: "1.wav"},
+		FileNames: []string{"1.wav"}}, nil)
 }
 
 func TestWrongPath(t *testing.T) {

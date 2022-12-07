@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/utils"
 
 	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
@@ -115,7 +115,7 @@ func download(data *Data) func(echo.Context) error {
 			return echo.NewHTTPError(http.StatusBadRequest, "No file")
 		}
 
-		fullName, err := url.JoinPath(id, fileName)
+		fullName, err := utils.MakeValidateFileName(id, fileName)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusBadRequest, "Wrong name")
@@ -175,7 +175,7 @@ func downloadAudio(data *Data) func(echo.Context) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "No file by ID")
 		}
-		fullName, err := url.JoinPath(id, req.Filename)
+		fullName, err := utils.MakeValidateFileName(id, req.FileName.String)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusBadRequest, "Wrong name")

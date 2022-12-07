@@ -11,7 +11,8 @@ type (
 	ReqData struct {
 		ID        string
 		FileCount int
-		Filename  string
+		FileName  sql.NullString // file name for audio download
+		FileNames []string       // file names for upload
 		Created   time.Time
 		Email     string
 		Params    map[string]string
