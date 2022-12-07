@@ -166,11 +166,6 @@ func upload(data *Data) func(echo.Context) error {
 			rd.FileName = sql.NullString{String: rd.FileNames[0], Valid: true}
 			audioReady = true
 		}
-		err = saveFiles(ctx, data.Saver, rd.ID, files, fHeaders)
-		if err != nil {
-			goapp.Log.Error().Err(err).Send()
-			return echo.NewHTTPError(http.StatusInternalServerError)
-		}
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
@@ -190,7 +185,6 @@ func upload(data *Data) func(echo.Context) error {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-
 		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: rd.ID}}, messages.Upload)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()

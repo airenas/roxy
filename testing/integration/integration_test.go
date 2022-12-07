@@ -192,7 +192,7 @@ func TestResult_GetFile(t *testing.T) {
 	test.CheckCode(t, resp, http.StatusOK)
 
 	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
-	assert.Equal(t, latFileContent, takeStr(resp))
+	assert.Equal(t, latFileContent, test.RStr(t, resp.Body))
 }
 
 func TestResult_GetFile2(t *testing.T) {
@@ -203,13 +203,7 @@ func TestResult_GetFile2(t *testing.T) {
 	test.CheckCode(t, resp, http.StatusOK)
 
 	assert.Equal(t, "attachment; filename=res.txt", resp.Header.Get("Content-Disposition"))
-	assert.Equal(t, resFileContent, takeStr(resp))
-}
-
-func takeStr(resp *http.Response) string {
-	var b bytes.Buffer
-	_, _ = b.ReadFrom(resp.Body)
-	return b.String()
+	assert.Equal(t, resFileContent, test.RStr(t, resp.Body))
 }
 
 func TestResult_Head(t *testing.T) {
@@ -229,8 +223,8 @@ func TestResult_Audio(t *testing.T) {
 	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
 	test.CheckCode(t, resp, http.StatusOK)
 
-	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
-	assert.Equal(t, audioFileContent, takeStr(resp))
+	assert.Equal(t, "attachment; filename=audio.wav", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, audioFileContent, test.RStr(t, resp.Body), "for id: " + id)
 }
 
 func TestResult_AudioHead(t *testing.T) {
@@ -240,8 +234,8 @@ func TestResult_AudioHead(t *testing.T) {
 	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodHead, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
 	test.CheckCode(t, resp, http.StatusOK)
 
-	assert.Equal(t, "attachment; filename=lat.txt", resp.Header.Get("Content-Disposition"))
-	assert.Equal(t, "audio.wav content", takeStr(resp))
+	assert.Equal(t, "attachment; filename=audio.wav", resp.Header.Get("Content-Disposition"))
+	assert.Equal(t, "", test.RStr(t, resp.Body))
 }
 
 func uploadWaitFakeFile(t *testing.T) string {
@@ -322,6 +316,9 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 		case "/ausis/result.service/result/1111/res.txt":
 			w.Header().Add("content-disposition", `attachment; filename="res.txt"`)
 			io.Copy(w, strings.NewReader(resFileContent))
+		case "/ausis/result.service/audio/1111":
+			w.Header().Add("content-disposition", `attachment; filename="res.wav"`)
+			io.Copy(w, strings.NewReader(audioFileContent))	
 		case "/ausis/clean.service/1111":
 			io.Copy(w, strings.NewReader(`OK`))
 		default:
