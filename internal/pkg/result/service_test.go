@@ -110,6 +110,29 @@ func Test_Live(t *testing.T) {
 	test.Code(t, tEcho, req, 200)
 }
 
+func Test_validate(t *testing.T) {
+	initTest(t)
+	type args struct {
+		data *Data
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "OK", args: args{data: &Data{Reader: filerMock, NameProvider: dbMock}}, wantErr: false},
+		{name: "Fail Reader", args: args{data: &Data{NameProvider: dbMock}}, wantErr: true},
+		{name: "Fail DB", args: args{data: &Data{Reader: filerMock}}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validate(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("StartWebServer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 type testFileWrap struct {
 	s string
 	n string
