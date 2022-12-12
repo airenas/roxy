@@ -52,6 +52,7 @@ func main() {
 		if err != nil {
 			goapp.Log.Fatal().Err(err).Msg("can't init location")
 		}
+		goapp.Log.Info().Str("local", time.Now().In(data.Location).Format(time.RFC3339)).Msg("time")
 	}
 
 	data.EmailSender, err = ainform.NewSimpleEmailSender(cfg)
