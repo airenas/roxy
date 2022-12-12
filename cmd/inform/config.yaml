@@ -6,3 +6,13 @@ db:
 
 worker:
     count: 1
+
+mail:
+    url: http://localhost:7050/tts/results/{{ID}}
+    template: mail.tmpl  
+
+smtp:
+    host: smtp.gmail.com
+    port: 587
+    username: airenass@gmail.com 
+    # password:     

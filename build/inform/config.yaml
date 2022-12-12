@@ -1,0 +1,16 @@
+# db:
+    # url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable  
+
+worker:
+    count: 1
+    location: Europe/Vilnius
+
+mail:
+    # url: http://localhost:7050/tts/results/{{ID}}
+    template: /app/template/mail.tmpl  
+
+smtp:
+    host: smtp.gmail.com
+    port: 587
+    # username:  
+    # password:  

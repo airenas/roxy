@@ -1,0 +1,112 @@
+{{/*Intelektika.lt mail templates*/}}
+{{/*===================================================================*/}}
+{{define "signature.text"}}
+
+---
+
+Dėkojame, kad naudojatės UAB „Intelektika“ paslaugomis. Jei turite klausimų, susiekite su mumis adresu info@intelektika.lt
+
+Pagarbiai,
+UAB „Intelektika“ komanda{{end}}
+{{/*===================================================================*/}}
+{{define "signature.html"}}
+{{/*===================================================================*/}}
+<br/><hr/><br/>
+<i><p>
+Dėkojame, kad naudojatės UAB „Intelektika“ paslaugomis. Jei turite klausimų, susiekite su mumis adresu <a href="mailto:info@intelektika.lt">info@intelektika.lt</a>
+</p><p>
+Pagarbiai,
+</p><p>
+UAB „Intelektika“ komanda
+</p></i>
+{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Started.subject"}}Pradėta Transkripcija{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Started.text"}}
+Laba diena,
+
+informuojame, kad {{.Date}} pradėta Jūsų užsakyta transkripcijos paslauga.
+
+Transkripcijai suteiktas ID: {{.ID}}
+
+Tranksripcijos paslaugos statusą galite stebėti čia: {{.URL}}
+
+{{template "signature.text"}}
+{{end}}
+
+
+{{/*===================================================================*/}}
+{{define "mail.Started.html"}}
+{{/*===================================================================*/}}
+<html><body>
+<i>Laba diena,</i>
+<p>
+informuojame, kad <b>{{.Date}}</b> pradėta Jūsų užsakyta transkripcijos paslauga.
+</p><p>
+Transkripcijai suteiktas ID: <b><i>{{.ID}}</i></b>
+</p><p>
+Transkripcijos paslaugos statusą galite stebėti <b><a href="{{.URL}}">čia</a></b>.
+</p>
+{{template "signature.html"}}
+</body></html>
+{{end}}
+
+
+{{/*===================================================================*/}}
+{{define "mail.Finished.subject"}}Baigta Transkripcija{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Finished.text"}}
+Laba diena,
+
+informuojame, kad Jūsų užsakyta transkripcija Nr. {{.ID}} įvykdyta.
+
+Paslaugos rezultatus galite atsisiųsti arba peržiūrėti, paspaudę {{.URL}}
+
+Primename, kad paslaugos rezultatai saugomi 3 (tris) dienas nuo šio laiško gavimo datos (imtinai)
+
+{{template "signature.text"}}
+{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Finished.html"}}
+{{/*===================================================================*/}}
+<html><body>
+<i>Laba diena,</i>
+<p>
+informuojame, kad Jūsų užsakyta transkripcija Nr. <i>{{.ID}}</i> <b>įvykdyta</b>.
+</p><p>
+Paslaugos rezultatus galite atsisiųsti arba peržiūrėti, paspaudę <b><a href="{{.URL}}">čia</a></b>.
+</p><p>
+Primename, kad paslaugos rezultatai saugomi 3 (tris) dienas nuo šio laiško gavimo datos (imtinai)
+</p>
+{{template "signature.html"}}
+</body></html>
+{{end}}
+
+{{/*===================================================================*/}}
+{{define "mail.Failed.subject"}}Nepavyko Transkripcija{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Failed.text"}}
+Laba diena,
+
+informuojame, kad Jūsų užsakyta transkripcija Nr. {{.ID}} nepavyko.
+
+Daugiau informacijos čia: {{.URL}}
+
+{{template "signature.text"}}
+{{end}}
+{{/*===================================================================*/}}
+{{define "mail.Failed.html"}}
+{{/*===================================================================*/}}
+<html><body>
+<i>Laba diena,</i>
+<p>
+informuojame, kad Jūsų užsakyta transkripcija Nr. <i>{{.ID}}</i> <b>nepavyko</b>.
+</p>
+<p>
+Daugiau informacijos <b><a href="{{.URL}}">čia</a></b>.
+</p>
+{{template "signature.html"}}
+</body></html>
+{{end}}
+{{/*===================================================================*/}}

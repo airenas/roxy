@@ -44,7 +44,7 @@ docker/%/build:
 #####################################################################################
 ## build all containers
 build/all: docker/dbmigrate/build docker/upload/build docker/worker/build docker/status/build \
-	docker/result/build
+	docker/result/build docker/inform/build
 .PHONY: build/all
 #####################################################################################
 ## push docker for provided service
