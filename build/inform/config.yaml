@@ -13,4 +13,5 @@ smtp:
     host: smtp.gmail.com
     port: 587
     # username:  
-    # password:  
+    # password: 
+    # fakeUrl: http://localhost:7050/fakemail

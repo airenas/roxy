@@ -6,6 +6,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/gorilla/websocket"
+	"github.com/jordan-wright/email"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +44,13 @@ type config struct {
 	httpclient         *http.Client
 }
 
+type emails struct {
+	mails []email.Email
+	lock  *sync.RWMutex
+}
+
 var cfg config
+var emailData = emails{lock: &sync.RWMutex{}}
 
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
@@ -224,7 +233,7 @@ func TestResult_Audio(t *testing.T) {
 	test.CheckCode(t, resp, http.StatusOK)
 
 	assert.Equal(t, "attachment; filename=audio.wav", resp.Header.Get("Content-Disposition"))
-	assert.Equal(t, audioFileContent, test.RStr(t, resp.Body), "for id: " + id)
+	assert.Equal(t, audioFileContent, test.RStr(t, resp.Body), "for id: "+id)
 }
 
 func TestResult_AudioHead(t *testing.T) {
@@ -236,6 +245,47 @@ func TestResult_AudioHead(t *testing.T) {
 
 	assert.Equal(t, "attachment; filename=audio.wav", resp.Header.Get("Content-Disposition"))
 	assert.Equal(t, "", test.RStr(t, resp.Body))
+}
+
+func TestInform_Send(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+	testEmailReceived(t, id, "Pradėta")
+	testEmailReceived(t, id, "Baigta")
+}
+
+func TestInform_Failure(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "fail"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[api.StatusData](t, resp)
+	testEmailReceived(t, ur.ID, "Pradėta")
+	testEmailReceived(t, ur.ID, "Nepavyko")
+}
+
+func testEmailReceived(t *testing.T, id, msgType string) {
+	t.Helper()
+	dur := time.Second * 60
+	tm := time.After(dur)
+	for {
+		select {
+		case <-tm:
+			require.Failf(t, "Fail", "Not found email for %s(%s) %v", id, msgType, dur)
+		default:
+			emailData.lock.RLock()
+			for _, e := range emailData.mails {
+				et := string(e.Text)
+				if strings.Contains(et, id) && strings.Contains(e.Subject, msgType) {
+					emailData.lock.RUnlock()
+					return
+				}
+			}
+			emailData.lock.RUnlock()
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func uploadWaitFakeFile(t *testing.T) string {
@@ -290,6 +340,16 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 		// log.Printf("request to: " + r.URL.String())
 		switch r.URL.String() {
 		case "/ausis/transcriber/upload":
+			err := r.ParseMultipartForm(20 << 1)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if len(r.MultipartForm.Value["recognizer"]) > 0 &&
+				r.MultipartForm.Value["recognizer"][0] == "fail" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
 			io.Copy(w, strings.NewReader(`{"id":"1111"}`))
 		case "/ausis/status.service/subscribe":
 			handleStatusWS(w, r, func(c *websocket.Conn) {
@@ -318,11 +378,21 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 			io.Copy(w, strings.NewReader(resFileContent))
 		case "/ausis/result.service/audio/1111":
 			w.Header().Add("content-disposition", `attachment; filename="res.wav"`)
-			io.Copy(w, strings.NewReader(audioFileContent))	
+			io.Copy(w, strings.NewReader(audioFileContent))
 		case "/ausis/clean.service/1111":
 			io.Copy(w, strings.NewReader(`OK`))
+		case "/fakeURL":
+			emailData.lock.Lock()
+			defer emailData.lock.Unlock()
+			var email email.Email
+			err := json.NewDecoder(r.Body).Decode(&email)
+			if err != nil {
+				log.Print(err)
+			}
+			log.Printf("got email: %s, %.50s", email.Subject, string(email.Text))
+			emailData.mails = append(emailData.mails, email)
 		default:
-			log.Printf("Unknown request to: " + r.URL.String())
+			log.Printf("Unknown request to: '%s'", r.URL.String())
 		}
 	}))
 

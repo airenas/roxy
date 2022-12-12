@@ -42,9 +42,7 @@ services:
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
       - MAIL_URL=http://localhost:7050/tts/results/{{ID}}
       - SMTP_USERNAME=fake@email.com
-      - TRANSCRIBER_STATUSURL=ws${TRANSCRIPTION_URL_PART}/ausis/status.service/subscribe
-      - TRANSCRIBER_RESULTURL=http${TRANSCRIPTION_URL_PART}/ausis/result.service
-      - TRANSCRIBER_CLEANURL=http${TRANSCRIPTION_URL_PART}/ausis/clean.service    
+      - SMTP_FAKEURL=http://integration-tests:9876/fakeURL
 
   result:
     image: airenas/roxy-result:${result_version}

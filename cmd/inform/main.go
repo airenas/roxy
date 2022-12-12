@@ -55,9 +55,19 @@ func main() {
 		goapp.Log.Info().Str("local", time.Now().In(data.Location).Format(time.RFC3339)).Msg("time")
 	}
 
-	data.EmailSender, err = ainform.NewSimpleEmailSender(cfg)
-	if err != nil {
-		goapp.Log.Fatal().Err(err).Msg("can't init email sender")
+	if cfg.GetString("smtp.fakeUrl") == "" {
+		goapp.Log.Info().Str("sender", "real").Msg("smtp")
+		data.EmailSender, err = ainform.NewSimpleEmailSender(cfg)
+		if err != nil {
+			goapp.Log.Fatal().Err(err).Msg("can't init email sender")
+
+		}
+	} else {
+		goapp.Log.Info().Str("sender", "fake").Msg("smtp")
+		data.EmailSender, err = inform.NewFakeEmailSender(cfg)
+		if err != nil {
+			goapp.Log.Fatal().Err(err).Msg("can't init fake email sender")
+		}
 	}
 
 	db, err := postgres.NewDB(dbPool)
