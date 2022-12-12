@@ -40,6 +40,7 @@ type config struct {
 	statusURL          string
 	resultURL          string
 	statusSubscribeURL string
+	cleanURL           string
 	dbURL              string
 	httpclient         *http.Client
 }
@@ -56,6 +57,7 @@ func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
 	cfg.statusURL = GetEnvOrFail("STATUS_URL")
 	cfg.resultURL = GetEnvOrFail("RESULT_URL")
+	cfg.cleanURL = GetEnvOrFail("CLEAN_URL")
 	cfg.statusSubscribeURL = GetEnvOrFail("STATUS_SUBSCRIBE_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
@@ -66,6 +68,7 @@ func TestMain(m *testing.M) {
 	WaitForOpenOrFail(tCtx, cfg.uploadURL)
 	WaitForOpenOrFail(tCtx, cfg.statusURL)
 	WaitForOpenOrFail(tCtx, cfg.resultURL)
+	WaitForOpenOrFail(tCtx, cfg.cleanURL)
 	waitForDB(tCtx, cfg.dbURL)
 
 	//start mocks service for private services - not in this docker compose
@@ -277,6 +280,26 @@ func TestInform_Failure(t *testing.T) {
 	ur := test.Decode[api.StatusData](t, resp)
 	testEmailReceived(t, ur.ID, "Pradėta")
 	testEmailReceived(t, ur.ID, "Nepavyko")
+}
+
+func TestClean(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+
+	resp := test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	resp = test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodDelete, cfg.cleanURL, fmt.Sprintf("delete/%s", id), nil))
+	test.CheckCode(t, resp, http.StatusOK)
+
+	resp = test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodGet, cfg.resultURL, fmt.Sprintf("audio/%s", id), nil))
+	test.CheckCode(t, resp, http.StatusNotFound)
+
+	resp = test.Invoke(t, cfg.httpclient, NewRequest(t, http.MethodHead, cfg.resultURL, fmt.Sprintf("result/%s/lat.txt", id), nil))
+	test.CheckCode(t, resp, http.StatusNotFound)
+
+	st := getStatus(t, id)
+	assert.NotEqual(t, "NOT_FOUND", st.Status)
 }
 
 func testEmailReceived(t *testing.T, id, msgType string) {

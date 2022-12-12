@@ -54,6 +54,16 @@ services:
     ports:
       - 8183:8000 
 
+  clean:
+    image: airenas/roxy-clean:${clean_version}
+    restart: on-failure
+    environment:
+      - FILER_URL=minio:9000
+      - FILER_KEY=${MINIO_PASS}
+      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
+    ports:
+      - 8184:8000     
+
   migrate:
     image: airenas/roxy-dbmigrate:${migrate_version}
     command: ["-path", "/migrations", "-database",  "postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable", "up"]
@@ -71,7 +81,8 @@ services:
     environment:
       - UPLOAD_URL=http://upload:8000  
       - STATUS_URL=http://status:8000
-      - RESULT_URL=http://result:8000  
+      - RESULT_URL=http://result:8000
+      - CLEAN_URL=http://clean:8000  
       - STATUS_SUBSCRIBE_URL=ws://status:8000/subscribe  
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable   
     volumes:

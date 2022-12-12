@@ -12,7 +12,7 @@ help:
 #####################################################################################
 ## start all containers
 start: 
-	docker compose up $(async) db migrate minio upload worker status result inform
+	docker compose up $(async) db migrate minio upload worker status result inform clean
 .PHONY: start
 ## start one specific container
 start/%: 
