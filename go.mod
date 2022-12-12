@@ -3,7 +3,7 @@ module github.com/airenas/roxy
 go 1.19
 
 require (
-	github.com/airenas/async-api v1.0.58
+	github.com/airenas/async-api v1.0.59
 	github.com/airenas/go-app v1.0.22
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
@@ -17,6 +17,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.43
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.28.0
+	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/vgarvardt/gue/v5 v5.0.0-20221117214937-23d992003b8e
 )
@@ -65,7 +66,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.14.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
