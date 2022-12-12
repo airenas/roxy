@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [upload, dbmigrate, worker, status, result]
+        container: [upload, dbmigrate, worker, status, result, inform]
     steps:
       - uses: actions/checkout@v2
 
