@@ -7,11 +7,11 @@ import (
 const (
 	st = "ROXY/"
 	// Upload queue name
-	Upload = st + "Upload"
+	Upload = st + "Work:wrk-upload"
 	// Work queue name
 	Work = st + "Work"
 	// Fail queue name
-	Fail = st + "Fail"
+	Fail = st + "Work:wrk-fail"
 	// Inform  queue name
 	Inform = st + "Inform"
 	// StatusChange queue name

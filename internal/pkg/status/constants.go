@@ -1,6 +1,6 @@
 package status
 
-//Status represents asr status
+// Status represents asr status
 type Status int
 
 const (
@@ -10,13 +10,15 @@ const (
 	Working
 	// Completed - final step
 	Completed
+	// Failure - final failing step
+	Failure
 )
 
 var (
 	statusName = map[Status]string{Uploaded: "UPLOADED", Completed: "COMPLETED",
-		Working: "Working"}
+		Working: "Working", Failure: "Failure"}
 	nameStatus = map[string]Status{"UPLOADED": Uploaded, "COMPLETED": Completed,
-		"Working": Working}
+		"Working": Working, "Failure": Failure}
 )
 
 func (st Status) String() string {

@@ -28,6 +28,9 @@ func CreateHandler[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) 
 		if j.ErrorCount > 2 {
 			goapp.Log.Error().Int32("time", j.ErrorCount).Str("lastError", j.LastError.String).Msg("msg failed, will not retry")
 			if failureSender != nil {
+				if err := sendStatusChangeFailure(ctx, failureSender, m, j.LastError.String); err != nil {
+					goapp.Log.Error().Err(err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send status failure msg")
+				}
 				if err := sendFailure(ctx, failureSender, m); err != nil {
 					goapp.Log.Error().Err(err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send failure msg")
 				}
@@ -53,4 +56,14 @@ func sendFailure(ctx context.Context, sender MsgSender, m interface{}) error {
 	return sender.SendMessage(ctx, amessages.InformMessage{
 		QueueMessage: *amessages.NewQueueMessageFromM(&am.QueueMessage),
 		Type:         amessages.InformTypeFailed, At: time.Now()}, messages.Inform)
+}
+
+func sendStatusChangeFailure(ctx context.Context, sender MsgSender, m interface{}, errStr string) error {
+	am, ok := m.(messages.ASRMessage)
+	if !ok {
+		return fmt.Errorf("no ASRMessage")
+	}
+	goapp.Log.Info().Str("ID", am.ID).Msg("sending failure status change msg")
+	return sender.SendMessage(ctx, messages.ASRMessage{
+		QueueMessage: amessages.QueueMessage{ID: am.ID, Error: errStr}}, messages.Fail)
 }

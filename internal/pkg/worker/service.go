@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/status"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/vgarvardt/gue/v5"
@@ -57,9 +59,11 @@ type ServiceData struct {
 }
 
 const (
-	wrkQueuePrefix = messages.Upload + ":"
+	wrkQueuePrefix = messages.Work + ":"
 	wrkStatusQueue = "wrk-status"
 	wrkStatusClean = "wrk-clean"
+	wrkStatusFail  = "wrk-fail"
+	wrkUpload      = "wrk-upload"
 )
 
 // StartWorkerService starts the event queue listener service to listen for events
@@ -71,14 +75,15 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Upload: utils.CreateHandler(data, handleASR, data.MsgSender),
-		wrkStatusQueue:  utils.CreateHandler(data, handleStatus, data.MsgSender),
-		wrkStatusClean:  utils.CreateHandler(data, handleClean, nil),
+		wrkUpload:      utils.CreateHandler(data, handleASR, data.MsgSender),
+		wrkStatusQueue: utils.CreateHandler(data, handleStatus, data.MsgSender),
+		wrkStatusClean: utils.CreateHandler(data, handleClean, nil),
+		wrkStatusFail:  utils.CreateHandler(data, handleFailure, nil),
 	}
 
 	pool, err := gue.NewWorkerPool(
 		data.GueClient, wm, data.WorkerCount,
-		gue.WithPoolQueue(messages.Upload),
+		gue.WithPoolQueue(messages.Work),
 		gue.WithPoolLogger(utils.NewGueLoggerAdapter()),
 		gue.WithPoolPollInterval(500*time.Millisecond),
 		gue.WithPoolPollStrategy(gue.RunAtPollStrategy),
@@ -204,6 +209,26 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 			}
 		}
 	}
+	return nil
+}
+
+func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
+	goapp.Log.Info().Str("ID", m.ID).Msg("handling failure")
+	goapp.Log.Info().Str("ID", m.ID).Msg("load status")
+	statusRec, err := data.DB.LoadStatus(ctx, m.ID)
+	if err != nil {
+		return fmt.Errorf("can't load status: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", statusRec)
+	if statusRec.Error.String != "" {
+		goapp.Log.Info().Str("ID", m.ID).Msg("error set - ignore")
+	}
+	statusRec.Error = sql.NullString{String: m.Error, Valid: true}
+	statusRec.ErrorCode = sql.NullString{String: status.Failure.String(), Valid: true}
+	if err := data.DB.UpdateStatus(ctx, statusRec); err != nil {
+		return fmt.Errorf("can't save status: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
 	return nil
 }
 

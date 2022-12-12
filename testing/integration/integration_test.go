@@ -134,19 +134,23 @@ func TestStatus_Check(t *testing.T) {
 	assert.NotEmpty(t, ur.ID)
 	st := getStatus(t, ur.ID)
 	assert.NotEqual(t, "NOT_FOUND", st.Status)
-	testWaitCompleted(t, ur.ID)
+	testWaitStatus(t, ur.ID, "COMPLETED", false)
 }
 
-func testWaitCompleted(t *testing.T, id string) {
-	dur := time.Second * 60
+func testWaitStatus(t *testing.T, id, status string, fail bool) {
+	dur := time.Second * 30
 	tm := time.After(dur)
+	failStr := "not failed"
+	if fail {
+		failStr = "failed"
+	}
 	for {
 		select {
 		case <-tm:
-			require.Failf(t, "Fail", "Not COMPLETED in %v", dur)
+			require.Failf(t, "Fail", "Not %s(%s) in %v", status, failStr, dur)
 		default:
 			st := getStatus(t, id)
-			if st.Status == "COMPLETED" {
+			if st.Status == status && (!fail || st.Error != "") {
 				return
 			}
 			time.Sleep(time.Second)
@@ -180,6 +184,16 @@ func TestStatus_Subscribe(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestStatus_Failure(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "fail"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[api.StatusData](t, resp)
+	testWaitStatus(t, ur.ID, "UPLOADED", true)
 }
 
 func TestResultLive(t *testing.T) {
@@ -267,7 +281,7 @@ func TestInform_Failure(t *testing.T) {
 
 func testEmailReceived(t *testing.T, id, msgType string) {
 	t.Helper()
-	dur := time.Second * 60
+	dur := time.Second * 30
 	tm := time.After(dur)
 	for {
 		select {
@@ -295,7 +309,7 @@ func uploadWaitFakeFile(t *testing.T) string {
 	test.CheckCode(t, resp, http.StatusOK)
 	ur := test.Decode[api.StatusData](t, resp)
 
-	testWaitCompleted(t, ur.ID)
+	testWaitStatus(t, ur.ID, "COMPLETED", false)
 	return ur.ID
 }
 
