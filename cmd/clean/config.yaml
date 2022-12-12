@@ -1,0 +1,17 @@
+port: 8184
+
+logger:
+    level: DEBUG
+
+db:
+    url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable  
+
+timer:
+    runEvery: 1m        
+    expire: 1h        
+
+filer:
+    url: localhost:9000
+    user: roxy
+    key: roxy-int-secret
+    bucket: asr

@@ -14,4 +14,6 @@ CREATE TABLE requests(
     updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_requests_created_selector ON requests (created);
+
 COMMIT;
