@@ -173,7 +173,7 @@ func downloadAudio(data *Data) func(echo.Context) error {
 		}
 		req, err := data.NameProvider.LoadRequest(c.Request().Context(), id)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "No file by ID")
+			return echo.NewHTTPError(http.StatusNotFound, "No file by ID")
 		}
 		fullName, err := utils.MakeValidateFileName(id, req.FileName.String)
 		if err != nil {
