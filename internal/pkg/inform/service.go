@@ -59,7 +59,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	if err := validate(data); err != nil {
 		return nil, err
 	}
-	goapp.Log.Info().Int("workers", data.WorkerCount).Msg("Starting listen for messages")
+	goapp.Log.Info().Int("workers", data.WorkerCount).Str("queue", messages.Inform).Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
 		messages.Inform: utils.CreateHandler(data, handleInform, nil),

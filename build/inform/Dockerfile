@@ -23,6 +23,8 @@ WORKDIR /app
 RUN mkdir -p /app && chown -R app:app /app
 RUN mkdir -p /data && chown -R app:app /data   
 
+RUN apk --no-cache add tzdata
+
 ARG BUILD_VERSION=0.1
 
 LABEL org.opencontainers.image.version=$BUILD_VERSION \
