@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [upload, dbmigrate, worker, status, result, inform]
+        container: [upload, dbmigrate, worker, status, result, inform, clean]
     steps:
       - uses: actions/checkout@v2
 
       - name: Build containers ${{ matrix.container }}
-        run: make docker/${{ matrix.container }}/build migrate_version=latest upload_version=latest worker_version=latest status_version=latest result_version=latest
+        run: make docker/${{ matrix.container }}/build migrate_version=latest upload_version=latest worker_version=latest status_version=latest result_version=latest inform_version=latest clean_version=latest 
 
       - name: Run Snyk to check ${{ matrix.container }} Docker image for vulnerabilities
         continue-on-error: true

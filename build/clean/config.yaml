@@ -1,10 +1,5 @@
 port: 8000
 
-# mongo:
-#   url:
-
-type: db
-
 fileStorage:
     path: /data
     patterns:
@@ -13,3 +8,12 @@ fileStorage:
 timer:
     runEvery: 1h        
     expire: 168h   
+
+# db:
+#     url: postgres://roxy:roxy-int-secret@localhost:5433/asr?sslmode=disable     
+
+filer:
+    # url: localhost:9000
+    user: roxy
+    # key: roxy-int-secret
+    bucket: asr    
