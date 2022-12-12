@@ -21,7 +21,7 @@ func (m *Filer) SaveFile(ctx context.Context, name string, r io.Reader) error {
 // LoadFile func mock
 func (m *Filer) LoadFile(ctx context.Context, fileName string) (io.ReadSeekCloser, error) {
 	args := m.Called(ctx, fileName)
-	return to[io.ReadSeekCloser](args.Get(0)), args.Error(1)
+	return To[io.ReadSeekCloser](args.Get(0)), args.Error(1)
 }
 
 // DB is postgress DB mock
@@ -41,11 +41,11 @@ func (m *DB) InsertStatus(ctx context.Context, req *persistence.Status) error {
 
 func (m *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(*persistence.ReqData), args.Error(1)
+	return To[*persistence.ReqData](args.Get(0)), args.Error(1)
 }
 func (m *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, error) {
 	args := m.Called(ctx, id)
-	return to[*persistence.Status](args.Get(0)), args.Error(1)
+	return To[*persistence.Status](args.Get(0)), args.Error(1)
 }
 func (m *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error) {
 	args := m.Called(ctx, id)
@@ -57,6 +57,14 @@ func (m *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) err
 }
 func (m *DB) UpdateStatus(ctx context.Context, data *persistence.Status) error {
 	args := m.Called(ctx, data)
+	return args.Error(0)
+}
+func (m *DB) LockEmailTable(ctx context.Context, id, lType string) error {
+	args := m.Called(ctx, id, lType)
+	return args.Error(0)
+}
+func (m *DB) UnLockEmailTable(ctx context.Context, id, lType string, val *int) error {
+	args := m.Called(ctx, id, lType, val)
 	return args.Error(0)
 }
 
@@ -96,7 +104,8 @@ func (m *Transcriber) Clean(ctx context.Context, ID string) error {
 	return args.Error(0)
 }
 
-func to[T interface{}](val interface{}) T {
+// To convert interface to object
+func To[T interface{}](val interface{}) T {
 	if val == nil {
 		var res T
 		return res

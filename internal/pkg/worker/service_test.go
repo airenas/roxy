@@ -1,13 +1,12 @@
 package worker
 
 import (
-	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/messages"
+	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,7 +33,7 @@ func initTest(t *testing.T) {
 
 func Test_handleClean(t *testing.T) {
 	initTest(t)
-	err := handleClean(testCtx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
+	err := handleClean(test.Ctx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
 	assert.Nil(t, err)
 }
 
@@ -42,7 +41,7 @@ func Test_handleClean_Fail(t *testing.T) {
 	initTest(t)
 	transcriberMock.ExpectedCalls = nil
 	transcriberMock.On("Clean", mock.Anything, mock.Anything).Return(fmt.Errorf("olia err"))
-	err := handleClean(testCtx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
+	err := handleClean(test.Ctx(t), &messages.CleanMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2"}, srvData)
 	assert.NotNil(t, err)
 }
 
@@ -78,11 +77,4 @@ func Test_validate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func testCtx(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cf := context.WithTimeout(context.Background(), time.Second*10)
-	t.Cleanup(func() { cf() })
-	return ctx
 }
