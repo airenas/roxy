@@ -117,12 +117,16 @@ func statusHandler(data *Data) func(echo.Context) error {
 			res = result{ID: id, Status: "NOT_FOUND", Error: "NOT_FOUND", ErrorCode: "NOT_FOUND"}
 
 		} else {
-			res = result{ID: st.ID, Status: st.Status, Error: st.Error.String, ErrorCode: st.ErrorCode.String, Progress: st.Progress.Int32,
-				AudioReady: st.AudioReady, AvailableResults: st.AvailableResults, RecognizedText: utils.FromSQLStr(st.RecognizedText)}
+			res = *mapStatus(st)
 
 		}
 		return c.JSON(http.StatusOK, res)
 	}
+}
+
+func mapStatus(st *persistence.Status) *result {
+	return &result{ID: st.ID, Status: st.Status, Error: st.Error.String, ErrorCode: st.ErrorCode.String, Progress: st.Progress.Int32,
+		AudioReady: st.AudioReady, AvailableResults: st.AvailableResults, RecognizedText: utils.FromSQLStr(st.RecognizedText)}
 }
 
 func validate(data *Data) error {

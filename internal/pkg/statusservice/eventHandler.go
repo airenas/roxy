@@ -72,11 +72,8 @@ func handleStatus(ctx context.Context, m *messages.ASRMessage, data *HandlerData
 		if st == nil {
 			return fmt.Errorf("no status for ID %s", m.ID)
 		}
-		res := &result{ID: m.ID, ErrorCode: st.ErrorCode.String, Error: st.Error.String,
-			Status: st.Status, Progress: st.Progress.Int32,
-			AudioReady: st.AudioReady, AvailableResults: st.AvailableResults}
 		for _, c := range conns {
-			if err := sendMsg(c, res); err != nil {
+			if err := sendMsg(c, mapStatus(st)); err != nil {
 				goapp.Log.Error().Err(err).Send()
 			}
 		}
