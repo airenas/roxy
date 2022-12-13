@@ -1,10 +1,5 @@
 port: 8000
 
-fileStorage:
-    path: /data
-    patterns:
-        - in/{ID}.txt
-        - work/{ID}/
 timer:
     runEvery: 1h        
     expire: 168h   
