@@ -1,7 +1,6 @@
 package result
 
 import (
-	"database/sql"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
+	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func initTest(t *testing.T) {
 	tEcho = initRoutes(tData)
 	filerMock.On("LoadFile", mock.Anything, "1/olia").Return(&testFileWrap{s: "olia", n: "res.txt"}, nil)
 	filerMock.On("LoadFile", mock.Anything, "1/1.wav").Return(&testFileWrap{s: "audio", n: "res.wav"}, nil)
-	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: sql.NullString{String: "1.wav"},
+	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: utils.ToSQLStr("1.wav"),
 		FileNames: []string{"1.wav"}}, nil)
 }
 

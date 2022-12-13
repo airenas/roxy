@@ -1,7 +1,6 @@
 package inform
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
+	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/jordan-wright/email"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,8 +30,8 @@ func initTest(t *testing.T) {
 	makerMock = &mockEmailMaker{}
 	srvData = &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, EmailSender: senderMock,
 		EmailMaker: makerMock, Location: nil}
-	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: sql.NullString{String: "1.wav"},
-		FileNames: []string{"1.wav"}, Email: "o@o.lt"}, nil)
+	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: utils.ToSQLStr("1.wav"),
+		FileNames: []string{"1.wav"}, Email: utils.ToSQLStr("o@o.lt")}, nil)
 	dbMock.On("LockEmailTable", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	dbMock.On("UnLockEmailTable", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	senderMock.On("Send", mock.Anything).Return(nil)
@@ -47,6 +47,7 @@ func Test_handleInform(t *testing.T) {
 	assert.Equal(t, "Started", dbMock.Calls[1].Arguments[2])
 	assert.Equal(t, "Started", dbMock.Calls[2].Arguments[2])
 	assert.Equal(t, 2, dbMock.Calls[2].Arguments[3])
+	assert.Equal(t, 1, len(senderMock.Calls))
 }
 
 func Test_handleInformFinish(t *testing.T) {
@@ -56,6 +57,16 @@ func Test_handleInformFinish(t *testing.T) {
 	require.Equal(t, 3, len(dbMock.Calls))
 	assert.Equal(t, messages.InformTypeFinished, dbMock.Calls[1].Arguments[2])
 	assert.Equal(t, messages.InformTypeFinished, dbMock.Calls[2].Arguments[2])
+}
+
+func Test_handleInform_Skip(t *testing.T) {
+	initTest(t)
+	dbMock.ExpectedCalls = nil
+	dbMock.On("LoadRequest", mock.Anything, "1").Return(&persistence.ReqData{ID: "1", FileName: utils.ToSQLStr("1.wav"),
+		FileNames: []string{"1.wav"}}, nil)
+	err := handleInform(test.Ctx(t), &messages.InformMessage{QueueMessage: messages.QueueMessage{ID: "1"}, Type: messages.InformTypeStarted}, srvData)
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(senderMock.Calls))
 }
 
 func Test_handleInform_FailDB(t *testing.T) {

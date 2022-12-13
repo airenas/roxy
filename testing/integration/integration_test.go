@@ -91,6 +91,16 @@ func TestUpload(t *testing.T) {
 	test.CheckCode(t, test.Invoke(t, cfg.httpclient, req), http.StatusOK)
 }
 
+func TestUpload_WorksWithoutEmail(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"recognizer", "ben"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[api.StatusData](t, resp)
+	testWaitStatus(t, ur.ID, "COMPLETED", false)
+}
+
 func TestUpload_SeveralFiles(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav", "audio2.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},

@@ -3,7 +3,6 @@ package worker
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -224,8 +223,8 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	if statusRec.Error.String != "" {
 		goapp.Log.Info().Str("ID", m.ID).Msg("error set - ignore")
 	}
-	statusRec.Error = sql.NullString{String: m.Error, Valid: true}
-	statusRec.ErrorCode = sql.NullString{String: status.Failure.String(), Valid: true}
+	statusRec.Error = utils.ToSQLStr(m.Error)
+	statusRec.ErrorCode = utils.ToSQLStr(status.Failure.String())
 	if err := data.DB.UpdateStatus(ctx, statusRec); err != nil {
 		return fmt.Errorf("can't save status: %w", err)
 	}

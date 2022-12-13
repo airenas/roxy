@@ -14,7 +14,7 @@ type (
 		FileName  sql.NullString // file name for audio download
 		FileNames []string       // file names for upload
 		Created   time.Time
-		Email     string
+		Email     sql.NullString 
 		Params    map[string]string
 		RequestID string
 	}

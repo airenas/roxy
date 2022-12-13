@@ -2,7 +2,6 @@ package upload
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -70,7 +69,7 @@ func StartWebServer(data *Data) error {
 
 	e.Server.Addr = ":" + portStr
 	e.Server.ReadHeaderTimeout = 5 * time.Second
-	e.Server.ReadTimeout = 60 * time.Second
+	e.Server.ReadTimeout = 180 * time.Second
 	e.Server.WriteTimeout = 30 * time.Second
 
 	gracehttp.SetLogger(log.New(goapp.Log, "", 0))
@@ -157,13 +156,13 @@ func upload(data *Data) func(echo.Context) error {
 		}
 
 		rd.Created = time.Now()
-		rd.Email = c.FormValue(api.PrmEmail)
+		rd.Email = utils.ToSQLStr(c.FormValue(api.PrmEmail))
 		rd.FileCount = len(files)
 		rd.Params = takeParams(form)
-		rd.FileName = sql.NullString{String: rd.ID + ".mp3", Valid: true}
+		rd.FileName = utils.ToSQLStr(rd.ID + ".mp3")
 		audioReady := false
 		if len(files) == 1 {
-			rd.FileName = sql.NullString{String: rd.FileNames[0], Valid: true}
+			rd.FileName = utils.ToSQLStr(rd.FileNames[0])
 			audioReady = true
 		}
 		rd.RequestID = extractRequestID(c.Request().Header)

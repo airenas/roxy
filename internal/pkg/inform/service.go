@@ -101,12 +101,12 @@ func handleInform(ctx context.Context, m *amessages.InformMessage, data *Service
 	if err != nil {
 		return fmt.Errorf("can't retrieve email: %w", err)
 	}
-	if req.Email == "" {
+	if req.Email.String == "" {
 		goapp.Log.Info().Msg("No email, skip")
 		return nil
 	}
 
-	mailData.Email = req.Email
+	mailData.Email = req.Email.String
 
 	email, err := data.EmailMaker.Make(&mailData)
 	if err != nil {
