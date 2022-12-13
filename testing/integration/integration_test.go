@@ -299,7 +299,7 @@ func TestClean(t *testing.T) {
 	test.CheckCode(t, resp, http.StatusNotFound)
 
 	st := getStatus(t, id)
-	assert.NotEqual(t, "NOT_FOUND", st.Status)
+	assert.Equalf(t, "NOT_FOUND", st.Status, "was '%s'", st.Status)
 }
 
 func testEmailReceived(t *testing.T, id, msgType string) {
