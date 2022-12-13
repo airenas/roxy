@@ -229,6 +229,12 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 		return fmt.Errorf("can't save status: %w", err)
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
+	goapp.Log.Info().Str("ID", m.ID).Msg("send status change")
+	err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.StatusChange)
+	if err != nil {
+		return fmt.Errorf("can't send msg: %w", err)
+	}
 	return nil
 }
 

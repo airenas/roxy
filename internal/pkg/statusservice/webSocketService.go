@@ -1,7 +1,9 @@
 package statusservice
 
 import (
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/airenas/go-app/pkg/goapp"
 )
@@ -18,6 +20,7 @@ type WSConnKeeper struct {
 	idConnectionMap map[string]map[WsConn]struct{}
 	connectionIDMap map[WsConn]string
 	mapLock         *sync.Mutex
+	timeOut         time.Duration
 }
 
 // NewWSConnKeeper creates manager
@@ -26,6 +29,7 @@ func NewWSConnKeeper() *WSConnKeeper {
 	res.idConnectionMap = make(map[string]map[WsConn]struct{})
 	res.connectionIDMap = make(map[WsConn]string)
 	res.mapLock = &sync.Mutex{}
+	res.timeOut = time.Minute * 30 // add max time limit for connection - if longer so sorry
 	return res
 }
 
@@ -33,14 +37,41 @@ func NewWSConnKeeper() *WSConnKeeper {
 func (kp *WSConnKeeper) HandleConnection(conn WsConn) error {
 	defer kp.deleteConnection(conn)
 	defer conn.Close()
+	readCh := make(chan string)
+	go func() {
+		defer close(readCh)
+		defer goapp.Log.Info().Msg("read routine ended")
+		for {
+			goapp.Log.Info().Msg("handleConnection")
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				goapp.Log.Error().Err(err).Send()
+				return
+			}
+			msg := strings.TrimSpace(string(message))
+			goapp.Log.Info().Str("msg", msg).Msg("got msg")
+			if msg != "" {
+				readCh <- msg
+			} else {
+				time.Sleep(20 * time.Millisecond)
+			}
+		}
+	}()
+
+	ta := time.After(kp.timeOut)
+loop:
 	for {
-		goapp.Log.Info().Msg("handleConnection")
-		_, message, err := conn.ReadMessage()
-		if err != nil {
-			goapp.Log.Error().Err(err).Send()
-			break
-		} else {
-			kp.saveConnection(conn, string(message))
+		select {
+		case <-ta:
+			goapp.Log.Info().Msg("conn timeouted")
+			break loop
+		case msg, ok := <-readCh:
+			if !ok {
+				goapp.Log.Info().Msg("conn read closed?")
+				break loop
+			}
+			kp.saveConnection(conn, msg)
+			ta = time.After(kp.timeOut)
 		}
 	}
 	goapp.Log.Info().Msg("handleConnection finish")
@@ -70,7 +101,7 @@ func (kp *WSConnKeeper) deleteConnectionNoSync(conn WsConn) {
 }
 
 func (kp *WSConnKeeper) saveConnection(conn WsConn, id string) {
-	goapp.Log.Info().Msg("saveConnection")
+	goapp.Log.Info().Str("ID", id).Msg("saveConnection")
 	kp.mapLock.Lock()
 	defer kp.mapLock.Unlock()
 	kp.deleteConnectionNoSync(conn)
@@ -79,6 +110,8 @@ func (kp *WSConnKeeper) saveConnection(conn WsConn, id string) {
 	if !found {
 		conns = map[WsConn]struct{}{}
 		kp.idConnectionMap[id] = conns
+	} else {
+		goapp.Log.Info().Str("ID", id).Msgf("found old ws connection")
 	}
 	conns[conn] = struct{}{}
 	goapp.Log.Info().Msgf("saveConnection finish: %d", len(kp.connectionIDMap))
@@ -86,6 +119,7 @@ func (kp *WSConnKeeper) saveConnection(conn WsConn, id string) {
 
 // GetConnections returns saved connections by provided id
 func (kp *WSConnKeeper) GetConnections(id string) ([]WsConn, bool) {
+	goapp.Log.Info().Str("ID", id).Msgf("get ws connections")
 	kp.mapLock.Lock()
 	defer kp.mapLock.Unlock()
 	cm, found := kp.idConnectionMap[id]
@@ -96,5 +130,6 @@ func (kp *WSConnKeeper) GetConnections(id string) ([]WsConn, bool) {
 		}
 		return res, true
 	}
+	goapp.Log.Info().Str("ID", id).Msgf("no ws connections")
 	return nil, false
 }
