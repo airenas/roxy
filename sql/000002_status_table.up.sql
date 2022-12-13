@@ -8,6 +8,7 @@ CREATE TABLE status(
     progress INT DEFAULT 0,
     error_code TEXT,
     error TEXT,
+    recognized_text TEXT,
     audio_ready BOOL DEFAULT FALSE,
     available_results JSONB,
     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

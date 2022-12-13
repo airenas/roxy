@@ -45,4 +45,5 @@ type StatusMessage struct {
 	AudioReady       bool     `json:"audioReady,omitempty"`
 	AvailableResults []string `json:"avResults,omitempty"`
 	ExternalID       string   `json:"extID,omitempty"`
+	RecognizedText   string   `json:"recognizedText,omitempty"`
 }

@@ -184,6 +184,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	status.ErrorCode.String = m.ErrorCode
 	status.Progress.Int32 = int32(m.Progress)
 	status.Status = m.Status
+	status.RecognizedText = utils.ToSQLStr(m.RecognizedText)
 	if err := data.DB.UpdateStatus(ctx, status); err != nil {
 		return fmt.Errorf("can't save status: %w", err)
 	}
@@ -290,6 +291,7 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, extID, ID s
 		ErrorCode:        statusData.ErrorCode,
 		AudioReady:       statusData.AudioReady,
 		AvailableResults: statusData.AvResults,
+		RecognizedText:   statusData.RecognizedText,
 		ExternalID:       extID,
 	}, wrkQueuePrefix+wrkStatusQueue)
 	if err != nil {

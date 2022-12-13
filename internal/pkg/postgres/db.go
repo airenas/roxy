@@ -96,9 +96,9 @@ func (db *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, e
 	}
 	var res persistence.Status
 	err = db.pool.QueryRow(ctx, `SELECT id, status, progress, error_code, error,
-    audio_ready, available_results, version FROM status
+    audio_ready, available_results, recognized_text, version FROM status
 		WHERE id = $1`, id).Scan(&res.ID, &res.Status, &res.Progress, &res.ErrorCode,
-		&res.Error, &res.AudioReady, &res.AvailableResults, &res.Version)
+		&res.Error, &res.AudioReady, &res.AvailableResults, &res.RecognizedText, &res.Version)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -118,9 +118,10 @@ func (db *DB) UpdateStatus(ctx context.Context, item *persistence.Status) error 
 	error = $7, 
 	error_code=$8,
 	updated = $9,
+	recognized_text = $10,
 	version = $2 + 1 
 	WHERE id = $1 and version = $2`, item.ID, item.Version, item.Status,
-		item.AudioReady, item.AvailableResults, item.Progress, item.Error, item.ErrorCode, time.Now())
+		item.AudioReady, item.AvailableResults, item.Progress, item.Error, item.ErrorCode, time.Now(), item.RecognizedText)
 	if err != nil {
 		return fmt.Errorf("can't update status: %w", err)
 	}

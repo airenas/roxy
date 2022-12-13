@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/utils"
 
 	"github.com/airenas/go-app/pkg/goapp"
 
@@ -33,8 +34,8 @@ type WSConnHandler interface {
 
 // Data keeps data required for service work
 type Data struct {
-	Port     int
-	DB       DB
+	Port      int
+	DB        DB
 	WSHandler WSConnHandler
 }
 
@@ -117,7 +118,7 @@ func statusHandler(data *Data) func(echo.Context) error {
 
 		} else {
 			res = result{ID: st.ID, Status: st.Status, Error: st.Error.String, ErrorCode: st.ErrorCode.String, Progress: st.Progress.Int32,
-				AudioReady: st.AudioReady, AvailableResults: st.AvailableResults}
+				AudioReady: st.AudioReady, AvailableResults: st.AvailableResults, RecognizedText: utils.FromSQLStr(st.RecognizedText)}
 
 		}
 		return c.JSON(http.StatusOK, res)

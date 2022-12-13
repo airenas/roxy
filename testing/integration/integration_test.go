@@ -151,6 +151,13 @@ func TestStatus_Check(t *testing.T) {
 	testWaitStatus(t, ur.ID, "COMPLETED", false)
 }
 
+func TestStatus_Text(t *testing.T) {
+	t.Parallel()
+	id := uploadWaitFakeFile(t)
+	st := getStatus(t, id)
+	assert.Equal(t, "Olia olia", st.RecognizedText)
+}
+
 func testWaitStatus(t *testing.T, id, status string, fail bool) {
 	dur := time.Second * 30
 	tm := time.After(dur)
@@ -412,7 +419,8 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 					return
 				}
 				time.Sleep(1 * time.Second)
-				err = c.WriteMessage(mt, []byte(`{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"]}`))
+				err = c.WriteMessage(mt, []byte(`{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"],
+				"recognizedText": "Olia olia"}`))
 				if err != nil {
 					log.Print(err)
 					return
