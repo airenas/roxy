@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
@@ -436,7 +437,7 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 			if err != nil {
 				log.Print(err)
 			}
-			log.Printf("got email: %s, %.50s", email.Subject, string(email.Text))
+			log.Printf("got email: %s, %.50s", email.Subject, goapp.Sanitize(string(email.Text)))
 			emailData.mails = append(emailData.mails, email)
 		default:
 			log.Printf("Unknown request to: '%s'", r.URL.String())
