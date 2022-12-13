@@ -6,7 +6,7 @@ version?=$(worker_version)
 tag=$(service):$(version)
 
 dbuild:
-	cd ../../ && docker buildx build -t $(tag) --build-arg BUILD_VERSION=$(version) -f build/worker/Dockerfile .
+	cd ../../ && cat build/worker/Dockerfile | docker buildx build -t $(tag) --build-arg BUILD_VERSION=$(version) -f - .
 
 dpush: dbuild
 	docker push $(tag)
