@@ -2,7 +2,7 @@
 BEGIN;
 
 CREATE TABLE status(
-    id UUID NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
     status TEXT NOT NULL,
     status_external TEXT,
     progress INT DEFAULT 0,

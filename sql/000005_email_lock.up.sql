@@ -2,7 +2,7 @@
 BEGIN;
 
 CREATE TABLE email_lock(
-    id UUID NOT NULL,
+    id TEXT NOT NULL,
     key TEXT NOT NULL,
     value INT DEFAULT 0,
     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP

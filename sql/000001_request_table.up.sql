@@ -3,7 +3,7 @@ BEGIN;
 
 --Schema for requests table
 CREATE TABLE requests(
-    id UUID NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
     email TEXT,
     file_count INT DEFAULT 0,
     file_name TEXT,
