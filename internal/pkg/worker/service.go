@@ -11,6 +11,7 @@ import (
 
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/go-app/pkg/goapp"
+	"github.com/airenas/roxy/internal/pkg/api"
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/status"
@@ -311,11 +312,22 @@ func upload(ctx context.Context, req *persistence.ReqData, data *ServiceData) (s
 		goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
 	}
 	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
-	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: req.Params, Files: filesMap})
+	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap})
 	if err != nil {
 		return "", fmt.Errorf("can't upload: %w", err)
 	}
 	return extID, nil
+}
+
+// prepareParams drops email
+func prepareParams(in map[string]string) map[string]string {
+	res := map[string]string{}
+	for k, v := range in {
+		if k != api.PrmEmail {
+			res[k] = v
+		}
+	}
+	return res
 }
 
 func validate(data *ServiceData) error {

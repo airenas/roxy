@@ -2,9 +2,11 @@ package worker
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	amessages "github.com/airenas/async-api/pkg/messages"
+	"github.com/airenas/roxy/internal/pkg/api"
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
@@ -74,6 +76,25 @@ func Test_validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validate(tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("StartServer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_prepareParams(t *testing.T) {
+	tests := []struct {
+		name string
+		args map[string]string
+		want map[string]string
+	}{
+		{name: "Empty", args: map[string]string{}, want: map[string]string{}},
+		{name: "Drops email", args: map[string]string{api.PrmEmail: "olia"}, want: map[string]string{}},
+		{name: "Drops email", args: map[string]string{api.PrmEmail: "olia", api.PrmRecognizer: "ben"}, want: map[string]string{api.PrmRecognizer: "ben"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := prepareParams(tt.args); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("prepareParams() = %v, want %v", got, tt.want)
 			}
 		})
 	}
