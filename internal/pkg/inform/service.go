@@ -34,7 +34,7 @@ type EmailRetriever interface {
 // It is used to quarantee not to send the emails twice
 type DB interface {
 	LockEmailTable(context.Context, string, string) error
-	UnLockEmailTable(context.Context, string, string, *int) error
+	UnLockEmailTable(context.Context, string, string, int) error
 	LoadRequest(ctx context.Context, id string) (*persistence.ReqData, error)
 }
 
@@ -118,7 +118,12 @@ func handleInform(ctx context.Context, m *amessages.InformMessage, data *Service
 		return fmt.Errorf("can't lock mail table: %w", err)
 	}
 	var unlockValue = 0
-	defer data.DB.UnLockEmailTable(ctx, mailData.ID, mailData.MsgType, &unlockValue)
+	defer func(val *int) {
+		err := data.DB.UnLockEmailTable(ctx, mailData.ID, mailData.MsgType, *val)
+		if err != nil {
+			goapp.Log.Error().Err(err).Send()
+		}
+	}(&unlockValue)
 
 	err = data.EmailSender.Send(email)
 	if err != nil {

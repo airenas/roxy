@@ -63,7 +63,7 @@ func (m *DB) LockEmailTable(ctx context.Context, id, lType string) error {
 	args := m.Called(ctx, id, lType)
 	return args.Error(0)
 }
-func (m *DB) UnLockEmailTable(ctx context.Context, id, lType string, val *int) error {
+func (m *DB) UnLockEmailTable(ctx context.Context, id, lType string, val int) error {
 	args := m.Called(ctx, id, lType, val)
 	return args.Error(0)
 }

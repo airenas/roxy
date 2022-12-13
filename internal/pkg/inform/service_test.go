@@ -46,7 +46,7 @@ func Test_handleInform(t *testing.T) {
 	require.Equal(t, 3, len(dbMock.Calls))
 	assert.Equal(t, "Started", dbMock.Calls[1].Arguments[2])
 	assert.Equal(t, "Started", dbMock.Calls[2].Arguments[2])
-	assert.Equal(t, &[]int{2}[0], dbMock.Calls[2].Arguments[3])
+	assert.Equal(t, 2, dbMock.Calls[2].Arguments[3])
 }
 
 func Test_handleInformFinish(t *testing.T) {
@@ -83,7 +83,7 @@ func Test_handleInform_FailSender(t *testing.T) {
 	require.Equal(t, 3, len(dbMock.Calls))
 	assert.Equal(t, "Started", dbMock.Calls[1].Arguments[2])
 	assert.Equal(t, "Started", dbMock.Calls[2].Arguments[2])
-	assert.Equal(t, &[]int{0}[0], dbMock.Calls[2].Arguments[3])
+	assert.Equal(t, 0, dbMock.Calls[2].Arguments[3])
 }
 
 func Test_validate(t *testing.T) {

@@ -167,11 +167,11 @@ func (db *DB) LockEmailTable(ctx context.Context, ID string, key string) error {
 }
 
 // UnLockEmailTable replaces table status with value
-func (db *DB) UnLockEmailTable(ctx context.Context, ID string, key string, value *int) error {
-	goapp.Log.Info().Str("ID", ID).Str("key", key).Int("value", *value).Msg("unlocking")
+func (db *DB) UnLockEmailTable(ctx context.Context, ID string, key string, value int) error {
+	goapp.Log.Info().Str("ID", ID).Str("key", key).Int("value", value).Msg("unlocking")
 	res, err := db.pool.Exec(ctx,
 		`UPDATE email_lock SET value = $4 WHERE id = $1 and key = $2 and value = $3`,
-		ID, key, emailLockValue, *value)
+		ID, key, emailLockValue, value)
 	if err != nil {
 		return fmt.Errorf("can't unlock email_lock: %w", err)
 	}
