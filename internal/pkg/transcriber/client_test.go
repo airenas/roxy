@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -55,12 +54,15 @@ func initTestServer(t *testing.T, rData map[string]testResp) (*Client, *httptest
 			}
 			rw.WriteHeader(resp.code)
 			_, _ = rw.Write([]byte(resp.resp))
+		} else {
+			rw.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	// Use Client & URL from our local test server
 	api := Client{}
 	api.httpclient = server.Client()
-	api.statusURL = path.Join(server.URL, "status")
+	api.statusWSURL = server.URL
+	api.statusURL = server.URL
 	api.resultURL = server.URL
 	api.uploadURL, _ = url.JoinPath(server.URL, "upload")
 	api.cleanURL = server.URL
@@ -85,7 +87,7 @@ func testCalled(t *testing.T, URL string, tReq []testReq) {
 	assert.Equal(t, URL, str)
 }
 
-func TestStatus(t *testing.T) {
+func TestStatusWS(t *testing.T) {
 	upgrader := websocket.Upgrader{}
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		c, err := upgrader.Upgrade(rw, req, nil)
@@ -108,7 +110,7 @@ func TestStatus(t *testing.T) {
 
 	client := Client{}
 	client.httpclient = server.Client()
-	client.statusURL, _ = url.JoinPath("ws"+strings.TrimPrefix(server.URL, "http"), "status")
+	client.statusWSURL, _ = url.JoinPath("ws"+strings.TrimPrefix(server.URL, "http"), "status")
 	client.timeout = time.Second
 	client.backoff = func() backoff.BackOff {
 		return &backoff.StopBackOff{}
@@ -123,6 +125,17 @@ func TestStatus(t *testing.T) {
 	case <-time.After(time.Second):
 		assert.Fail(t, "timeout")
 	}
+}
+
+func TestStatus(t *testing.T) {
+	resp := newTestR(http.StatusOK, `{"status":"COMPLETED"}`)
+	client, _, tReq := initTestServer(t, map[string]testResp{"/status/k10": resp})
+
+	r, err := client.GetStatus(test.Ctx(t), "k10")
+
+	assert.Nil(t, err)
+	assert.Equal(t, "COMPLETED", r.Status)
+	testCalled(t, "/status/k10", *tReq)
 }
 
 func TestResult(t *testing.T) {
@@ -285,4 +298,37 @@ func TestClean_Fails(t *testing.T) {
 	assert.NotNil(t, err)
 	testCalled(t, "/10", *tReq)
 	assert.Equal(t, 4, len((*tReq)))
+}
+
+func TestNewClient(t *testing.T) {
+	type args struct {
+		uploadURL string
+		statusURL string
+		resultURL string
+		cleanURL  string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "OK", args: args{uploadURL: "http://olia", statusURL: "http://olia", resultURL: "http://olia", cleanURL: "http://olia"}, wantErr: false},
+		{name: "Missing params", args: args{statusURL: "http://olia", resultURL: "http://olia", cleanURL: "http://olia"}, wantErr: true},
+		{name: "Missing params", args: args{uploadURL: "http://olia", resultURL: "http://olia", cleanURL: "http://olia"}, wantErr: true},
+		{name: "Missing params", args: args{uploadURL: "http://olia", statusURL: "http://olia", cleanURL: "http://olia"}, wantErr: true},
+		{name: "Missing params", args: args{uploadURL: "http://olia", statusURL: "http://olia", resultURL: "http://olia"}, wantErr: true},
+		{name: "Wrong  status", args: args{uploadURL: "http://olia", statusURL: "ops://olia", resultURL: "http://olia", cleanURL: "http://olia"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewClient(tt.args.uploadURL, tt.args.statusURL, tt.args.resultURL, tt.args.cleanURL)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewClient() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got == nil {
+				t.Errorf("NewClient() = nil, want object")
+			}
+		})
+	}
 }

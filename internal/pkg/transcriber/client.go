@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 type Client struct {
 	httpclient    *http.Client
 	uploadURL     string
+	statusWSURL   string
 	statusURL     string
 	resultURL     string
 	cleanURL      string
@@ -48,6 +50,10 @@ func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error
 	if cleanURL == "" {
 		return nil, fmt.Errorf("no cleanURL")
 	}
+	if !strings.HasPrefix(statusURL, "http") {
+		return nil, fmt.Errorf("no http in statusURL")
+	}
+	res.statusWSURL = strings.Replace(statusURL, "http", "ws", 1)
 	res.uploadURL = uploadURL
 	res.uploadTimeout = time.Minute * 10
 	res.statusURL = statusURL
@@ -61,9 +67,9 @@ func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error
 
 // HookToStatus to status ws
 func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error) {
-	goapp.Log.Info().Str("url", sp.statusURL).Str("ID", ID).Msg("connect")
+	goapp.Log.Info().Str("url", sp.statusWSURL).Str("ID", ID).Msg("connect")
 	c, err := invokeWithBackoff(ctx, func() (*websocket.Conn, bool, error) {
-		c, _, err := websocket.DefaultDialer.DialContext(ctx, sp.statusURL, nil)
+		c, _, err := websocket.DefaultDialer.DialContext(ctx, fmt.Sprintf("%s/subscribe", sp.statusWSURL), nil)
 		return c, isRetryable(err), err
 	}, sp.backoff())
 	if err != nil {
@@ -120,6 +126,37 @@ func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.Stat
 		goapp.Log.Info().Str("ID", ID).Msg("exit write routine")
 	}()
 	return res, resF, nil
+}
+
+// GetStatus return status by ID
+func (sp *Client) GetStatus(ctx context.Context, ID string) (*tapi.StatusData, error) {
+	return invokeWithBackoff(ctx, func() (*tapi.StatusData, bool, error) {
+		ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
+		defer cancelF()
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/status/%s", sp.statusURL, ID), nil)
+		if err != nil {
+			return nil, false, err
+		}
+		req = req.WithContext(ctx)
+		resp, err := sp.httpclient.Do(req)
+		if err != nil {
+			return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
+		}
+		defer func() {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
+			_ = resp.Body.Close()
+		}()
+		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
+			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
+			return nil, isRetryableCode(resp.StatusCode), err
+		}
+		res := &tapi.StatusData{}
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, isRetryable(err), fmt.Errorf("can't unmarshal: %w", err)
+		}
+		return res, false, nil
+	}, sp.backoff())
 }
 
 // GetAudio return initial audio

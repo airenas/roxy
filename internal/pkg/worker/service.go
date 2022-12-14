@@ -44,6 +44,7 @@ type Filer interface {
 type Transcriber interface {
 	Upload(ctx context.Context, audio *tapi.UploadData) (string, error)
 	HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error)
+	GetStatus(ctx context.Context, ID string) (*tapi.StatusData, error)
 	GetAudio(ctx context.Context, ID string) (*tapi.FileData, error)
 	GetResult(ctx context.Context, ID, name string) (*tapi.FileData, error)
 	Clean(ctx context.Context, ID string) error
@@ -254,6 +255,7 @@ func isCompleted(st, errStr string) bool {
 }
 
 func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error {
+	manualCheck := time.Second * 20
 	stCh, cf, err := data.Transcriber.HookToStatus(ctx, extID)
 	if err != nil {
 		return fmt.Errorf("can't hook to status: %w", err)
@@ -271,6 +273,21 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 					return nil
 				}
 				finish, err := processStatus(ctx, &d, extID, ID, data)
+				if err != nil {
+					return fmt.Errorf("can't process status: %w", err)
+				}
+				if finish {
+					return nil
+				}
+			}
+		case <-time.After(manualCheck):
+			{
+				goapp.Log.Info().Msg("manual status check")
+				d, err := data.Transcriber.GetStatus(ctx, extID)
+				if err != nil {
+					return fmt.Errorf("can't get status: %w", err)
+				}
+				finish, err := processStatus(ctx, d, extID, ID, data)
 				if err != nil {
 					return fmt.Errorf("can't process status: %w", err)
 				}

@@ -89,6 +89,11 @@ func (m *Transcriber) HookToStatus(ctx context.Context, ID string) (<-chan api.S
 	return args.Get(0).(<-chan api.StatusData), args.Get(1).(func()), args.Error(1)
 }
 
+func (m *Transcriber) GetStatus(ctx context.Context, ID string) (*api.StatusData, error) {
+	args := m.Called(ctx, ID)
+	return args.Get(0).(*api.StatusData), args.Error(1)
+}
+
 func (m *Transcriber) GetAudio(ctx context.Context, ID string) (*api.FileData, error) {
 	args := m.Called(ctx, ID)
 	return args.Get(0).(*api.FileData), args.Error(1)
