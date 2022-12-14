@@ -11,6 +11,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/utils"
+	"github.com/airenas/roxy/internal/pkg/utils/handler"
 	"github.com/jordan-wright/email"
 	"github.com/vgarvardt/gue/v5"
 )
@@ -62,7 +63,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Int("workers", data.WorkerCount).Str("queue", messages.Inform).Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Inform: utils.CreateHandler(data, handleInform, nil),
+		messages.Inform: handler.Create(data, handleInform, handler.DefaultOpts()),
 	}
 
 	pool, err := gue.NewWorkerPool(

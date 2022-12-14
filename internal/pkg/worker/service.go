@@ -16,6 +16,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/status"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/airenas/roxy/internal/pkg/utils"
+	"github.com/airenas/roxy/internal/pkg/utils/handler"
 	"github.com/vgarvardt/gue/v5"
 )
 
@@ -75,10 +76,10 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		wrkUpload:      utils.CreateHandler(data, handleASR, data.MsgSender),
-		wrkStatusQueue: utils.CreateHandler(data, handleStatus, data.MsgSender),
-		wrkStatusClean: utils.CreateHandler(data, handleClean, nil),
-		wrkStatusFail:  utils.CreateHandler(data, handleFailure, nil),
+		wrkUpload:      handler.Create(data, handleASR, handler.DefaultOpts().WithFailure(data.MsgSender).WithTimeout(time.Minute*120)),
+		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts().WithFailure(data.MsgSender)),
+		wrkStatusClean: handler.Create(data, handleClean, handler.DefaultOpts()),
+		wrkStatusFail:  handler.Create(data, handleFailure, handler.DefaultOpts()),
 	}
 
 	pool, err := gue.NewWorkerPool(

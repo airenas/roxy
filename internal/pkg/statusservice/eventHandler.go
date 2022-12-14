@@ -9,6 +9,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/utils"
+	"github.com/airenas/roxy/internal/pkg/utils/handler"
 	"github.com/vgarvardt/gue/v5"
 )
 
@@ -34,7 +35,7 @@ func StartStatusHandler(ctx context.Context, data *HandlerData) (chan struct{}, 
 	goapp.Log.Info().Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.StatusChange: utils.CreateHandler(data, handleStatus, nil),
+		messages.StatusChange: handler.Create(data, handleStatus, handler.DefaultOpts()),
 	}
 
 	pool, err := gue.NewWorkerPool(
