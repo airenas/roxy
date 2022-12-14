@@ -75,7 +75,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	if err := validate(data); err != nil {
 		return nil, err
 	}
-	goapp.Log.Info().Msg("Starting listen for messages")
+	goapp.Log.Info().Int("workers", data.WorkerCount).Msg("Starting listen for messages")
 	if data.Testing {
 		goapp.Log.Warn().Msg("SERVICE IN TEST MODE")
 	}
@@ -113,7 +113,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 }
 
 func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
-	goapp.Log.Info().Str("ID", m.ID).Msg("handling")
+	goapp.Log.Info().Str("ID", m.ID).Msg("handling asr")
 	err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
 		QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
 		Type:         amessages.InformTypeStarted, At: time.Now()}, messages.Inform)

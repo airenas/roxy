@@ -30,6 +30,8 @@ func main() {
 		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
 	}
 
+	goapp.Log.Info().Int32("max_conn", dbConfig.MaxConns).Int32("min_conn", dbConfig.MinConns).Msg("db info")
+
 	dbPool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init db pool")
