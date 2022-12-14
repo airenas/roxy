@@ -188,8 +188,8 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		}
 		status.AvailableResults = m.AvailableResults
 	}
-	status.Error.String = m.Error
-	status.ErrorCode.String = m.ErrorCode
+	status.Error = utils.ToSQLStr(m.Error)
+	status.ErrorCode = utils.ToSQLStr(m.ErrorCode)
 	status.Progress.Int32 = int32(m.Progress)
 	status.Status = m.Status
 	status.RecognizedText = utils.ToSQLStr(m.RecognizedText)
