@@ -207,12 +207,22 @@ func TestStatus_Subscribe(t *testing.T) {
 
 func TestStatus_Failure(t *testing.T) {
 	t.Parallel()
-	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "fail"},
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failUpload"},
 		{"numberOfSpeakers", "1"}})
 	resp := test.Invoke(t, cfg.httpclient, req)
 	test.CheckCode(t, resp, http.StatusOK)
 	ur := test.Decode[api.StatusData](t, resp)
 	testWaitStatus(t, ur.ID, "UPLOADED", true)
+}
+
+func TestStatus_ExtFailure(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failStatus"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[uploadResponse](t, resp)
+	testWaitStatus(t, ur.ID, "Failure", true)
 }
 
 func TestResultLive(t *testing.T) {
@@ -289,11 +299,22 @@ func TestInform_Send(t *testing.T) {
 
 func TestInform_Failure(t *testing.T) {
 	t.Parallel()
-	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "fail"},
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failUpload"},
 		{"numberOfSpeakers", "1"}})
 	resp := test.Invoke(t, cfg.httpclient, req)
 	test.CheckCode(t, resp, http.StatusOK)
-	ur := test.Decode[api.StatusData](t, resp)
+	ur := test.Decode[uploadResponse](t, resp)
+	testEmailReceived(t, ur.ID, "Pradėta")
+	testEmailReceived(t, ur.ID, "Nepavyko")
+}
+
+func TestInform_ExtFailure(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failStatus"},
+		{"numberOfSpeakers", "1"}})
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	ur := test.Decode[uploadResponse](t, resp)
 	testEmailReceived(t, ur.ID, "Pradėta")
 	testEmailReceived(t, ur.ID, "Nepavyko")
 }
@@ -392,6 +413,7 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 	}
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// log.Printf("request to: " + r.URL.String())
+		okID, failID := "1111", "2222"
 		switch r.URL.String() {
 		case "/ausis/transcriber/upload":
 			err := r.ParseMultipartForm(20 << 1)
@@ -399,15 +421,22 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if len(r.MultipartForm.Value["recognizer"]) > 0 &&
-				r.MultipartForm.Value["recognizer"][0] == "fail" {
+			rec := ""
+			if len(r.MultipartForm.Value["recognizer"]) > 0 {
+				rec = r.MultipartForm.Value["recognizer"][0]
+			}
+			if rec == "failUpload" {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			io.Copy(w, strings.NewReader(`{"id":"1111"}`))
+			if rec == "failStatus" {
+				io.Copy(w, strings.NewReader(`{"id":"`+failID+`"}`))
+				return
+			}
+			io.Copy(w, strings.NewReader(`{"id":"`+okID+`"}`))
 		case "/ausis/status.service/subscribe":
 			handleStatusWS(w, r, func(c *websocket.Conn) {
-				mt, _, err := c.ReadMessage()
+				mt, id, err := c.ReadMessage()
 				if err != nil {
 					log.Print(err)
 					return
@@ -418,23 +447,27 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 					return
 				}
 				time.Sleep(1 * time.Second)
-				err = c.WriteMessage(mt, []byte(`{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"],
-				"recognizedText": "Olia olia"}`))
+				if string(id) == failID {
+					err = c.WriteMessage(mt, []byte(`{"status":"Failure", "error": "error"}`))
+				} else {
+					err = c.WriteMessage(mt, []byte(`{"status":"COMPLETED", "audioReady":true, "avResults":["lat.txt", "res.txt"],
+					"recognizedText": "Olia olia"}`))
+				}
 				if err != nil {
 					log.Print(err)
 					return
 				}
 			})
-		case "/ausis/result.service/result/1111/lat.txt":
+		case "/ausis/result.service/result/" + okID + "/lat.txt":
 			w.Header().Add("content-disposition", `attachment; filename="lat.txt"`)
 			io.Copy(w, strings.NewReader(latFileContent))
-		case "/ausis/result.service/result/1111/res.txt":
+		case "/ausis/result.service/result/" + okID + "/res.txt":
 			w.Header().Add("content-disposition", `attachment; filename="res.txt"`)
 			io.Copy(w, strings.NewReader(resFileContent))
-		case "/ausis/result.service/audio/1111":
+		case "/ausis/result.service/audio/" + okID:
 			w.Header().Add("content-disposition", `attachment; filename="res.wav"`)
 			io.Copy(w, strings.NewReader(audioFileContent))
-		case "/ausis/clean.service/1111":
+		case "/ausis/clean.service/" + okID:
 			io.Copy(w, strings.NewReader(`OK`))
 		case "/fakeURL":
 			emailData.lock.Lock()

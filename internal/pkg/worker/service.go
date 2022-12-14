@@ -209,16 +209,21 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
-		if m.Error == "" {
-			err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
-				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
-				Type:         amessages.InformTypeFinished, At: time.Now()}, messages.Inform)
-			if err != nil {
-				return fmt.Errorf("can't send msg: %w", err)
-			}
+		err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
+			QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
+			Type:         getInformFinishType(m.Error), At: time.Now()}, messages.Inform)
+		if err != nil {
+			return fmt.Errorf("can't send msg: %w", err)
 		}
 	}
 	return nil
+}
+
+func getInformFinishType(errStr string) string {
+	if errStr == "" {
+		return amessages.InformTypeFinished
+	}
+	return amessages.InformTypeFailed
 }
 
 func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
