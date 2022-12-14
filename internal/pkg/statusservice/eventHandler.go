@@ -32,7 +32,7 @@ func StartStatusHandler(ctx context.Context, data *HandlerData) (chan struct{}, 
 	if err := validateHandler(data); err != nil {
 		return nil, err
 	}
-	goapp.Log.Info().Msg("Starting listen for messages")
+	goapp.Log.Info().Int("workers", data.WorkerCount).Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
 		messages.StatusChange: handler.Create(data, handleStatus, handler.DefaultOpts()),
