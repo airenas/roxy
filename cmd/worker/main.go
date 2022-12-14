@@ -41,6 +41,7 @@ func main() {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue")
 	}
 	data.WorkerCount = cfg.GetInt("worker.count")
+	data.Testing = cfg.GetBool("worker.testing")
 	data.MsgSender, err = postgres.NewSender(dbPool)
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")

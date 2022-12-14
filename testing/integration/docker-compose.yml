@@ -26,13 +26,14 @@ services:
     restart: on-failure
     environment:
       - WORKER_COUNT=1
+      - WORKER_TESTING=true
       - FILER_URL=minio:9000
       - FILER_KEY=${MINIO_PASS}
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
-      - TRANSCRIBER_UPLOADURL=http${TRANSCRIPTION_URL_PART}/ausis/transcriber/upload
-      - TRANSCRIBER_STATUSURL=ws${TRANSCRIPTION_URL_PART}/ausis/status.service/subscribe
-      - TRANSCRIBER_RESULTURL=http${TRANSCRIPTION_URL_PART}/ausis/result.service
-      - TRANSCRIBER_CLEANURL=http${TRANSCRIPTION_URL_PART}/ausis/clean.service
+      - TRANSCRIBER_UPLOADURL=${TRANSCRIPTION_URL}/ausis/transcriber/upload
+      - TRANSCRIBER_STATUSURL=${TRANSCRIPTION_URL}/ausis/status.service
+      - TRANSCRIBER_RESULTURL=${TRANSCRIPTION_URL}/ausis/result.service
+      - TRANSCRIBER_CLEANURL=${TRANSCRIPTION_URL}/ausis/clean.service
 
   inform:
     image: airenas/roxy-inform:${inform_version}
@@ -83,7 +84,6 @@ services:
       - STATUS_URL=http://status:8000
       - RESULT_URL=http://result:8000
       - CLEAN_URL=http://clean:8000  
-      - STATUS_SUBSCRIBE_URL=ws://status:8000/subscribe  
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable   
     volumes:
       - ../../:/go/src/

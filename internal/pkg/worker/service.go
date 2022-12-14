@@ -58,6 +58,7 @@ type ServiceData struct {
 	DB          DB
 	Filer       Filer
 	Transcriber Transcriber
+	Testing     bool
 }
 
 const (
@@ -75,12 +76,17 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 		return nil, err
 	}
 	goapp.Log.Info().Msg("Starting listen for messages")
+	if data.Testing {
+		goapp.Log.Warn().Msg("SERVICE IN TEST MODE")
+	}
 
 	wm := gue.WorkMap{
-		wrkUpload:      handler.Create(data, handleASR, handler.DefaultOpts().WithFailure(data.MsgSender).WithTimeout(time.Minute*120)),
-		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts().WithFailure(data.MsgSender)),
-		wrkStatusClean: handler.Create(data, handleClean, handler.DefaultOpts()),
-		wrkStatusFail:  handler.Create(data, handleFailure, handler.DefaultOpts()),
+		wrkUpload: handler.Create(data, handleASR, handler.DefaultOpts().WithFailure(data.MsgSender).
+			WithTimeout(time.Minute*120).WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts().WithFailure(data.MsgSender).
+			WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusClean: handler.Create(data, handleClean, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusFail:  handler.Create(data, handleFailure, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 	}
 
 	pool, err := gue.NewWorkerPool(

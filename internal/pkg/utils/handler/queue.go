@@ -100,6 +100,19 @@ func DefaultBackoff() gue.Backoff {
 	}
 }
 
+func NoBackoff() gue.Backoff {
+	return func(retries int) time.Duration {
+		return 0
+	}
+}
+
+func DefaultBackoffOrTest(test bool) gue.Backoff {
+	if test {
+		return NoBackoff()
+	}
+	return DefaultBackoff()
+}
+
 func (o *Opts) WithFailure(failureSender MsgSender) *Opts {
 	o.failureSender = failureSender
 	return o
@@ -107,6 +120,11 @@ func (o *Opts) WithFailure(failureSender MsgSender) *Opts {
 
 func (o *Opts) WithTimeout(timeout time.Duration) *Opts {
 	o.timeout = timeout
+	return o
+}
+
+func (o *Opts) WithBackoff(b gue.Backoff) *Opts {
+	o.backoff = b
 	return o
 }
 

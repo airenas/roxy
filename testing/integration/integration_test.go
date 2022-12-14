@@ -37,13 +37,12 @@ const (
 )
 
 type config struct {
-	uploadURL          string
-	statusURL          string
-	resultURL          string
-	statusSubscribeURL string
-	cleanURL           string
-	dbURL              string
-	httpclient         *http.Client
+	uploadURL  string
+	statusURL  string
+	resultURL  string
+	cleanURL   string
+	dbURL      string
+	httpclient *http.Client
 }
 
 type emails struct {
@@ -59,7 +58,6 @@ func TestMain(m *testing.M) {
 	cfg.statusURL = GetEnvOrFail("STATUS_URL")
 	cfg.resultURL = GetEnvOrFail("RESULT_URL")
 	cfg.cleanURL = GetEnvOrFail("CLEAN_URL")
-	cfg.statusSubscribeURL = GetEnvOrFail("STATUS_SUBSCRIBE_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
 
@@ -356,7 +354,8 @@ func uploadWaitFakeFile(t *testing.T) string {
 
 func getStatusSubscribe(t *testing.T, id string) (<-chan api.StatusData, func()) {
 	t.Helper()
-	client, _ := transcriber.NewClient(cfg.uploadURL, cfg.statusSubscribeURL, cfg.uploadURL, cfg.uploadURL)
+	client, _ := transcriber.NewClient(cfg.uploadURL, cfg.statusURL, cfg.uploadURL, cfg.uploadURL)
+	require.NotNil(t, client)
 	r, ccf, err := client.HookToStatus(test.Ctx(t), id)
 	require.Nil(t, err)
 	return r, ccf
