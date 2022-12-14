@@ -41,17 +41,19 @@ type MsgSender interface {
 }
 
 // DBSaver saves requests to DB
-type DBSaver interface {
+type DB interface {
 	InsertRequest(ctx context.Context, req *persistence.ReqData) error
 	InsertStatus(ctx context.Context, req *persistence.Status) error
+	DeleteWorkData(ctx context.Context, ID string) error
 }
 
 // Data keeps data required for service work
 type Data struct {
-	Port      int
-	Saver     FileSaver
-	DBSaver   DBSaver
-	MsgSender MsgSender
+	Port        int
+	Saver       FileSaver
+	DB          DB
+	MsgSender   MsgSender
+	RetrySecret string
 }
 
 const requestIDHEader = "x-doorman-requestid"
@@ -81,8 +83,8 @@ func validate(data *Data) error {
 	if data.Saver == nil {
 		return errors.New("no file saver")
 	}
-	if data.DBSaver == nil {
-		return fmt.Errorf("no db saver")
+	if data.DB == nil {
+		return fmt.Errorf("no DB")
 	}
 	if data.MsgSender == nil {
 		return fmt.Errorf("no msg sender")
@@ -102,6 +104,9 @@ func initRoutes(data *Data) *echo.Echo {
 	promMdlw.Use(e)
 
 	e.POST("/upload", upload(data))
+	if data.RetrySecret != "" {
+		e.POST(fmt.Sprintf("/retry/%s/:id", data.RetrySecret), retry(data))
+	}
 	e.GET("/live", live(data))
 
 	goapp.Log.Info().Msg("Routes:")
@@ -168,12 +173,12 @@ func upload(data *Data) func(echo.Context) error {
 		rd.RequestID = extractRequestID(c.Request().Header)
 		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
 
-		err = data.DBSaver.InsertRequest(ctx, &rd)
+		err = data.DB.InsertRequest(ctx, &rd)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = data.DBSaver.InsertStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
+		err = data.DB.InsertStatus(ctx, &persistence.Status{ID: rd.ID, Status: status.Uploaded.String(),
 			Created: time.Now(), AudioReady: audioReady})
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
@@ -191,6 +196,30 @@ func upload(data *Data) func(echo.Context) error {
 		}
 
 		res := result{ID: rd.ID}
+		return c.JSON(http.StatusOK, res)
+	}
+}
+
+func retry(data *Data) func(echo.Context) error {
+	return func(c echo.Context) error {
+		defer goapp.Estimate("retry method")()
+		ctx := c.Request().Context()
+		id := c.Param("id")
+		if id == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "No ID")
+		}
+		err := data.DB.DeleteWorkData(ctx, id)
+		if err != nil {
+			goapp.Log.Error().Err(err).Send()
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
+		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: id}}, messages.Upload)
+		if err != nil {
+			goapp.Log.Error().Err(err).Send()
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		}
+
+		res := result{ID: id}
 		return c.JSON(http.StatusOK, res)
 	}
 }

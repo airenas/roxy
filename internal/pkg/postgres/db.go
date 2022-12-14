@@ -77,6 +77,14 @@ func (db *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) er
 	return nil
 }
 
+func (db *DB) DeleteWorkData(ctx context.Context, id string) error {
+	_, err := db.pool.Exec(ctx, `DELETE FROM work_data WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("can't delete work_data(%s): %w", id, err)
+	}
+	return nil
+}
+
 // InsertStatus inserts status into DB
 func (db *DB) InsertStatus(ctx context.Context, item *persistence.Status) error {
 	rows, err := db.pool.Query(ctx, `INSERT INTO status(id, status, audio_ready, created) 

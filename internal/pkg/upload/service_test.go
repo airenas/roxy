@@ -32,8 +32,9 @@ func initTest(t *testing.T) {
 	senderMock = &mocks.Sender{}
 	tData = &Data{}
 	tData.Saver = saverMock
-	tData.DBSaver = dbMock
+	tData.DB = dbMock
 	tData.MsgSender = senderMock
+	tData.RetrySecret = "secret"
 	tEcho = initRoutes(tData)
 	tResp = httptest.NewRecorder()
 	dbMock.On("InsertRequest", mock.Anything, mock.Anything).Return(nil)
@@ -117,6 +118,25 @@ func Test_Fails_MsgSender(t *testing.T) {
 	testCode(t, req, http.StatusInternalServerError)
 }
 
+func Test_Retry(t *testing.T) {
+	initTest(t)
+	dbMock.On("DeleteWorkData", mock.Anything, "10").Return(nil)
+	req := httptest.NewRequest("POST", "/retry/secret/10", nil)
+	resp := testCode(t, req, http.StatusOK)
+	bytes, _ := io.ReadAll(resp.Body)
+	assert.Contains(t, string(bytes), `"id":"`)
+	require.Equal(t, len(dbMock.Calls), 1)
+	require.Equal(t, len(senderMock.Calls), 1)
+}
+
+func Test_Retry_Fails(t *testing.T) {
+	initTest(t)
+	dbMock.On("DeleteWorkData", mock.Anything, "10").Return(fmt.Errorf("err"))
+	req := httptest.NewRequest("POST", "/retry/secret/10", nil)
+	testCode(t, req, http.StatusInternalServerError)
+	require.Equal(t, len(dbMock.Calls), 1)
+}
+
 func Test_Live(t *testing.T) {
 	initTest(t)
 	req := httptest.NewRequest(http.MethodGet, "/live", nil)
@@ -140,10 +160,10 @@ func Test_validate(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "OK", args: args{data: &Data{Saver: saverMock, DBSaver: dbMock, MsgSender: senderMock}}, wantErr: false},
-		{name: "Fail Saver", args: args{data: &Data{DBSaver: dbMock, MsgSender: senderMock}}, wantErr: true},
+		{name: "OK", args: args{data: &Data{Saver: saverMock, DB: dbMock, MsgSender: senderMock}}, wantErr: false},
+		{name: "Fail Saver", args: args{data: &Data{DB: dbMock, MsgSender: senderMock}}, wantErr: true},
 		{name: "Fail DB", args: args{data: &Data{Saver: saverMock, MsgSender: senderMock}}, wantErr: true},
-		{name: "Fail Sender", args: args{data: &Data{Saver: saverMock, DBSaver: dbMock}}, wantErr: true},
+		{name: "Fail Sender", args: args{data: &Data{Saver: saverMock, DB: dbMock}}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -14,13 +14,12 @@ type Cleaner struct {
 	tables []string
 }
 
-// NewDB creates Request instance
 func NewCleaner(pool *pgxpool.Pool) (*Cleaner, error) {
 	res := &Cleaner{pool: pool, tables: []string{"status", "work_data", "email_lock", "requests"}}
 	return res, nil
 }
 
-// InsertRequest inserts request into DB
+// Clean deletes all records with provided id from configured tables
 func (db *Cleaner) Clean(ctx context.Context, id string) error {
 	for _, t := range db.tables {
 		cmd, err := db.pool.Exec(ctx, `DELETE FROM `+t+` WHERE id = $1`, id)

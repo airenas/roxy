@@ -20,6 +20,7 @@ func main() {
 	cfg := goapp.Config
 	data := &upload.Data{}
 	data.Port = cfg.GetInt("port")
+	data.RetrySecret = cfg.GetString("retrySecret")
 	var err error
 
 	ctx := context.Background()
@@ -41,7 +42,7 @@ func main() {
 		goapp.Log.Fatal().Err(err).Msg("can't init db")
 	}
 
-	data.DBSaver = db
+	data.DB = db
 
 	data.Saver, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
 		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})

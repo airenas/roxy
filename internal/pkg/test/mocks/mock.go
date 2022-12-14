@@ -55,6 +55,10 @@ func (m *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) err
 	args := m.Called(ctx, data)
 	return args.Error(0)
 }
+func (m *DB) DeleteWorkData(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
 func (m *DB) UpdateStatus(ctx context.Context, data *persistence.Status) error {
 	args := m.Called(ctx, data)
 	return args.Error(0)
