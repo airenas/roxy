@@ -221,7 +221,10 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 
 func limit(s string, l int) string {
 	if len(s) > l {
-		return s[:l-3] + "..."
+		r := []rune(s) // make sure we don't break utf-8
+		if len(r) > l {
+			return string(r[:l-3]) + "..."
+		}
 	}
 	return s
 }
