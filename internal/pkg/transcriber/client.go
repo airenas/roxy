@@ -92,9 +92,9 @@ func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.Stat
 		defer close(res)
 		goapp.Log.Info().Str("ID", ID).Msg("enter status ws read loop")
 		for {
-			goapp.Log.Info().Str("ID", ID).Msg("before read")
+			goapp.Log.Debug().Str("ID", ID).Msg("before read")
 			_, message, err := c.ReadMessage()
-			goapp.Log.Info().Str("ID", ID).Str("data", string(message)).Msg("after read")
+			goapp.Log.Debug().Str("ID", ID).Msg("after read")
 			if err != nil {
 				goapp.Log.Warn().Err(err).Msg("socker read error")
 				break
@@ -105,7 +105,7 @@ func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.Stat
 				goapp.Log.Error().Err(err).Msg("can't unmarshal status data")
 				break
 			}
-			goapp.Log.Debug().Str("ID", ID).Str("data", string(message)).Msg("received status data")
+			goapp.Log.Debug().Str("ID", ID).Str("status", respData.Status).Str("error", goapp.Sanitize(respData.Error)).Msg("received status data")
 			res <- respData
 		}
 		goapp.Log.Info().Str("ID", ID).Msg("exit status ws read loop")
