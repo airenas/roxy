@@ -62,7 +62,7 @@ func Test_Status_Empty(t *testing.T) {
 	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(nil, nil)
 	resp := testCode(t, req, http.StatusOK)
 	res := test.Decode[result](t, resp.Result())
-	assert.Equal(t, result{ID: "2", Status: "NOT_FOUND", Error: "NOT_FOUND", ErrorCode: "NOT_FOUND",
+	assert.Equal(t, result{ID: "2", Status: "NOT_FOUND", Error: "Nežinomas ID: 2", ErrorCode: "NOT_FOUND",
 		AvailableResults: nil}, res)
 }
 

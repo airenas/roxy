@@ -10,15 +10,17 @@ const (
 	Working
 	// Completed - final step
 	Completed
-	// Failure - final failing step
-	Failure
+	// ServiceError - indicates service error
+	ServiceError
+	// ServiceError - indicates service error
+	NotFound
 )
 
 var (
 	statusName = map[Status]string{Uploaded: "UPLOADED", Completed: "COMPLETED",
-		Working: "Working", Failure: "Failure"}
+		Working: "Working", ServiceError: "SERVICE_ERROR", NotFound: "NOT_FOUND"}
 	nameStatus = map[string]Status{"UPLOADED": Uploaded, "COMPLETED": Completed,
-		"Working": Working, "Failure": Failure}
+		"Working": Working, "SERVICE_ERROR": ServiceError, "NOT_FOUND": NotFound}
 )
 
 func (st Status) String() string {

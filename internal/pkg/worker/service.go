@@ -192,7 +192,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	status.ErrorCode = utils.ToSQLStr(m.ErrorCode)
 	status.Progress.Int32 = int32(m.Progress)
 	status.Status = m.Status
-	status.RecognizedText = utils.ToSQLStr(m.RecognizedText)
+	status.RecognizedText = utils.ToSQLStr(limit(m.RecognizedText, 200))
 	if err := data.DB.UpdateStatus(ctx, status); err != nil {
 		return fmt.Errorf("can't save status: %w", err)
 	}
@@ -219,6 +219,13 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	return nil
 }
 
+func limit(s string, l int) string {
+	if len(s) > l {
+		return s[:l-3] + "..."
+	}
+	return s
+}
+
 func getInformFinishType(errStr string) string {
 	if errStr == "" {
 		return amessages.InformTypeFinished
@@ -238,7 +245,7 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 		goapp.Log.Info().Str("ID", m.ID).Msg("error set - ignore")
 	}
 	statusRec.Error = utils.ToSQLStr(m.Error)
-	statusRec.ErrorCode = utils.ToSQLStr(status.Failure.String())
+	statusRec.ErrorCode = utils.ToSQLStr(status.ServiceError.String())
 	if err := data.DB.UpdateStatus(ctx, statusRec); err != nil {
 		return fmt.Errorf("can't save status: %w", err)
 	}

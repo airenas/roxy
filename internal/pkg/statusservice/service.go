@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/airenas/roxy/internal/pkg/persistence"
+	"github.com/airenas/roxy/internal/pkg/status"
 	"github.com/airenas/roxy/internal/pkg/utils"
 
 	"github.com/airenas/go-app/pkg/goapp"
@@ -114,7 +115,8 @@ func statusHandler(data *Data) func(echo.Context) error {
 		}
 		var res result
 		if st == nil {
-			res = result{ID: id, Status: "NOT_FOUND", Error: "NOT_FOUND", ErrorCode: "NOT_FOUND"}
+			res = result{ID: id, Status: status.NotFound.String(), Error: fmt.Sprintf("Nežinomas ID: %s", id),
+				ErrorCode: status.NotFound.String()}
 
 		} else {
 			res = *mapStatus(st)

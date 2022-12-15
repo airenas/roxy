@@ -13,7 +13,8 @@ func TestStatus_String(t *testing.T) {
 		{st: Uploaded, want: "UPLOADED"},
 		{st: Completed, want: "COMPLETED"},
 		{st: Working, want: "Working"},
-		{st: Failure, want: "Failure"},
+		{st: ServiceError, want: "SERVICE_ERROR"},
+		{st: NotFound, want: "NOT_FOUND"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -34,7 +35,7 @@ func TestFrom(t *testing.T) {
 		{args: "olia", want: 0},
 		{args: "Working", want: Working},
 		{args: "UPLOADED", want: Uploaded},
-		{args: "Failure", want: Failure},
+		{args: "SERVICE_ERROR", want: ServiceError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

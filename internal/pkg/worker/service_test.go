@@ -99,3 +99,24 @@ func Test_prepareParams(t *testing.T) {
 		})
 	}
 }
+
+func Test_limit(t *testing.T) {
+	type args struct {
+		s string
+		l int
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := limit(tt.args.s, tt.args.l); got != tt.want {
+				t.Errorf("limit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
