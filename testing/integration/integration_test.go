@@ -122,7 +122,7 @@ func TestStatusLive(t *testing.T) {
 func TestStatus_Check_None(t *testing.T) {
 	t.Parallel()
 	st := getStatus(t, "10")
-	assert.Equal(t, "NOT_FOUND", st.Error)
+	assert.Equal(t, "Nežinomas ID: 10", st.Error)
 	assert.Equal(t, "10", st.ID)
 }
 
