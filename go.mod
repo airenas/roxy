@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/airenas/async-api v1.1.63
-	github.com/airenas/go-app v1.0.22
+	github.com/airenas/go-app v1.0.23
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
 	github.com/google/uuid v1.3.0
