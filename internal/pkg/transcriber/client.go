@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/airenas/go-app/pkg/goapp"
@@ -68,9 +65,9 @@ func NewClient(uploadURL, statusURL, resultURL, cleanURL string) (*Client, error
 // HookToStatus to status ws
 func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error) {
 	goapp.Log.Info().Str("url", sp.statusWSURL).Str("ID", ID).Msg("connect")
-	c, err := invokeWithBackoff(ctx, func() (*websocket.Conn, bool, error) {
+	c, err := goapp.InvokeWithBackoff(ctx, func() (*websocket.Conn, bool, error) {
 		c, _, err := websocket.DefaultDialer.DialContext(ctx, fmt.Sprintf("%s/subscribe", sp.statusWSURL), nil)
-		return c, isRetryable(err), err
+		return c, goapp.IsRetryableErr(err), err
 	}, sp.backoff())
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't dial to status URL: %w", err)
@@ -130,7 +127,7 @@ func (sp *Client) HookToStatus(ctx context.Context, ID string) (<-chan tapi.Stat
 
 // GetStatus return status by ID
 func (sp *Client) GetStatus(ctx context.Context, ID string) (*tapi.StatusData, error) {
-	return invokeWithBackoff(ctx, func() (*tapi.StatusData, bool, error) {
+	return goapp.InvokeWithBackoff(ctx, func() (*tapi.StatusData, bool, error) {
 		ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 		defer cancelF()
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/status/%s", sp.statusURL, ID), nil)
@@ -140,7 +137,7 @@ func (sp *Client) GetStatus(ctx context.Context, ID string) (*tapi.StatusData, e
 		req = req.WithContext(ctx)
 		resp, err := sp.httpclient.Do(req)
 		if err != nil {
-			return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
+			return nil, goapp.IsRetryableErr(err), fmt.Errorf("can't call: %w", err)
 		}
 		defer func() {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -148,12 +145,12 @@ func (sp *Client) GetStatus(ctx context.Context, ID string) (*tapi.StatusData, e
 		}()
 		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-			return nil, isRetryableCode(resp.StatusCode), err
+			return nil, goapp.IsRetryableCode(resp.StatusCode), err
 		}
 		res := &tapi.StatusData{}
 		err = json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return nil, isRetryable(err), fmt.Errorf("can't unmarshal: %w", err)
+			return nil, goapp.IsRetryableErr(err), fmt.Errorf("can't unmarshal: %w", err)
 		}
 		return res, false, nil
 	}, sp.backoff())
@@ -171,7 +168,7 @@ func (sp *Client) GetResult(ctx context.Context, ID, name string) (*tapi.FileDat
 
 func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, error) {
 	goapp.Log.Info().Str("url", urlStr).Msg("get file")
-	return invokeWithBackoff(ctx, func() (*tapi.FileData, bool, error) {
+	return goapp.InvokeWithBackoff(ctx, func() (*tapi.FileData, bool, error) {
 		ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 		defer cancelF()
 		req, err := http.NewRequest(http.MethodGet, urlStr, nil)
@@ -181,7 +178,7 @@ func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, e
 		req = req.WithContext(ctx)
 		resp, err := sp.httpclient.Do(req)
 		if err != nil {
-			return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
+			return nil, goapp.IsRetryableErr(err), fmt.Errorf("can't call: %w", err)
 		}
 		defer func() {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -189,11 +186,11 @@ func (sp *Client) getFile(ctx context.Context, urlStr string) (*tapi.FileData, e
 		}()
 		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-			return nil, isRetryableCode(resp.StatusCode), err
+			return nil, goapp.IsRetryableCode(resp.StatusCode), err
 		}
 		br, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, isRetryable(err), fmt.Errorf("can't read body: %w", err)
+			return nil, goapp.IsRetryableErr(err), fmt.Errorf("can't read body: %w", err)
 		}
 		res := &tapi.FileData{}
 		res.Content = br
@@ -240,7 +237,7 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 	}
 	writer.Close()
 
-	return invokeWithBackoff(ctx, func() (string, bool, error) {
+	return goapp.InvokeWithBackoff(ctx, func() (string, bool, error) {
 		var respData uploadResponse
 		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, body)
 		if err != nil {
@@ -254,7 +251,7 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 		goapp.Log.Info().Str("url", req.URL.String()).Str("method", req.Method).Msg("call")
 		resp, err := sp.httpclient.Do(req)
 		if err != nil {
-			return "", isRetryable(err), fmt.Errorf("can't call: %w", err)
+			return "", goapp.IsRetryableErr(err), fmt.Errorf("can't call: %w", err)
 		}
 		defer func() {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -262,11 +259,11 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 		}()
 		if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 			err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-			return "", isRetryableCode(resp.StatusCode), err
+			return "", goapp.IsRetryableCode(resp.StatusCode), err
 		}
 		br, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return "", isRetryable(err), fmt.Errorf("can't read body: %w", err)
+			return "", goapp.IsRetryableErr(err), fmt.Errorf("can't read body: %w", err)
 		}
 		err = json.Unmarshal(br, &respData)
 		if err != nil {
@@ -289,7 +286,7 @@ func getFileParam(i int) string {
 // Clean removes all transcription data related with ID
 func (sp *Client) Clean(ctx context.Context, ID string) error {
 	goapp.Log.Info().Str("url", sp.cleanURL).Msg("delete")
-	_, err := invokeWithBackoff(ctx,
+	_, err := goapp.InvokeWithBackoff(ctx,
 		func() (interface{}, bool, error) {
 			ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 			defer cancelF()
@@ -301,7 +298,7 @@ func (sp *Client) Clean(ctx context.Context, ID string) error {
 
 			resp, err := sp.httpclient.Do(req)
 			if err != nil {
-				return nil, isRetryable(err), fmt.Errorf("can't call: %w", err)
+				return nil, goapp.IsRetryableErr(err), fmt.Errorf("can't call: %w", err)
 			}
 			defer func() {
 				_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 10000))
@@ -309,15 +306,11 @@ func (sp *Client) Clean(ctx context.Context, ID string) error {
 			}()
 			if err := goapp.ValidateHTTPResp(resp, 100); err != nil {
 				err = fmt.Errorf("can't invoke '%s': %w", req.URL.String(), err)
-				return nil, isRetryableCode(resp.StatusCode), err
+				return nil, goapp.IsRetryableCode(resp.StatusCode), err
 			}
 			return nil, false, nil
 		}, sp.backoff())
 	return err
-}
-
-func isRetryableCode(c int) bool {
-	return c != http.StatusBadRequest && c != http.StatusUnauthorized && c != http.StatusNotFound && c != http.StatusConflict
 }
 
 func asrHTTPClient() *http.Client {
@@ -333,40 +326,6 @@ func newTransport() http.RoundTripper {
 	res.MaxIdleConnsPerHost = 50
 	res.IdleConnTimeout = 90 * time.Second
 	return res
-}
-
-func invokeWithBackoff[K any](ctx context.Context, f func() (K, bool, error), b backoff.BackOff) (K, error) {
-	c := 0
-	op := func() (K, error) {
-		select {
-		case <-ctx.Done():
-			return *new(K), backoff.Permanent(context.DeadlineExceeded)
-		default:
-			if c > 0 {
-				goapp.Log.Info().Int("count", c).Msg("retry")
-			}
-		}
-		c++
-		res, retry, err := f()
-		if err != nil && !retry {
-			goapp.Log.Info().Msg("not retryable error")
-			return res, backoff.Permanent(err)
-		}
-		return res, err
-	}
-	res, err := backoff.RetryWithData(op, newSimpleBackoff())
-	return res, err
-}
-
-func isRetryable(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) ||
-		isTimeout(err)
-}
-
-func isTimeout(err error) bool {
-	e, ok := err.(net.Error)
-	return ok && e.Timeout()
 }
 
 func newSimpleBackoff() backoff.BackOff {
