@@ -292,7 +292,7 @@ func TestClean(t *testing.T) {
 
 func TestClean_Fails(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/10": newTestR(500, "Error")})
-
+	client.backoff = newSimpleBackoff
 	err := client.Clean(test.Ctx(t), "10")
 
 	assert.NotNil(t, err)
