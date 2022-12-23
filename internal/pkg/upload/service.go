@@ -171,7 +171,7 @@ func upload(data *Data) func(echo.Context) error {
 			audioReady = true
 		}
 		rd.RequestID = extractRequestID(c.Request().Header)
-		goapp.Log.Info().Msgf("RequestID=%s", goapp.Sanitize(rd.RequestID))
+		goapp.Log.Info().Str("requestID", rd.RequestID).Msg("request info")
 
 		err = data.DB.InsertRequest(ctx, &rd)
 		if err != nil {
