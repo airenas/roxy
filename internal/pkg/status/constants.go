@@ -31,3 +31,21 @@ func (st Status) String() string {
 func From(st string) Status {
 	return nameStatus[st]
 }
+
+// ErrCode represents asr err codes
+type ErrCode int
+
+const (
+	// ServiceError - indicates service error
+	ECServiceError ErrCode = iota + 1
+	// ServiceError - indicates service error
+	ECNotFound
+)
+
+var (
+	errCodes = map[ErrCode]string{ECServiceError: "SERVICE_ERROR", ECNotFound: "NOT_FOUND"}
+)
+
+func (ec ErrCode) String() string {
+	return errCodes[ec]
+}

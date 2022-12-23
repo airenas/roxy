@@ -45,3 +45,21 @@ func TestFrom(t *testing.T) {
 		})
 	}
 }
+
+func TestErrCodes_String(t *testing.T) {
+	tests := []struct {
+		name string
+		st   ErrCode
+		want string
+	}{
+		{st: ECServiceError, want: "SERVICE_ERROR"},
+		{st: ECNotFound, want: "NOT_FOUND"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.st.String(); got != tt.want {
+				t.Errorf("Status.String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

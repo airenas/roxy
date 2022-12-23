@@ -40,6 +40,10 @@ type Filer interface {
 	SaveFile(ctx context.Context, name string, r io.Reader) error
 }
 
+type UsageRestorer interface {
+	Do(ctx context.Context, msgID, reqID, errStr string) error
+}
+
 // Transcriber provides transcription
 type Transcriber interface {
 	Upload(ctx context.Context, audio *tapi.UploadData) (string, error)
@@ -52,21 +56,23 @@ type Transcriber interface {
 
 // ServiceData keeps data required for service work
 type ServiceData struct {
-	GueClient   *gue.Client
-	WorkerCount int
-	MsgSender   MsgSender
-	DB          DB
-	Filer       Filer
-	Transcriber Transcriber
-	Testing     bool
+	GueClient     *gue.Client
+	WorkerCount   int
+	MsgSender     MsgSender
+	DB            DB
+	Filer         Filer
+	Transcriber   Transcriber
+	UsageRestorer UsageRestorer
+	Testing       bool
 }
 
 const (
-	wrkQueuePrefix = messages.Work + ":"
-	wrkStatusQueue = "wrk-status"
-	wrkStatusClean = "wrk-clean"
-	wrkStatusFail  = "wrk-fail"
-	wrkUpload      = "wrk-upload"
+	wrkQueuePrefix  = messages.Work + ":"
+	wrkStatusQueue  = "wrk-status"
+	wrkStatusClean  = "wrk-clean"
+	wrkStatusFail   = "wrk-fail"
+	wrkUpload       = "wrk-upload"
+	wrkRestoreUsage = "wrk-restore-usage"
 )
 
 // StartWorkerService starts the event queue listener service to listen for events
@@ -85,8 +91,9 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 			WithTimeout(time.Minute*120).WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts().WithFailure(data.MsgSender).
 			WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkStatusClean: handler.Create(data, handleClean, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkStatusFail:  handler.Create(data, handleFailure, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusClean:  handler.Create(data, handleClean, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusFail:   handler.Create(data, handleFailure, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkRestoreUsage: handler.Create(data, handleRestoreUsage, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 	}
 
 	pool, err := gue.NewWorkerPool(
@@ -215,6 +222,13 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
+		if m.Error != "" {
+			err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, wrkQueuePrefix+wrkRestoreUsage)
+			if err != nil {
+				return fmt.Errorf("can't send msg: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -259,6 +273,30 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
+	err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, wrkQueuePrefix+wrkRestoreUsage)
+	if err != nil {
+		return fmt.Errorf("can't send msg: %w", err)
+	}
+	return nil
+}
+
+func handleRestoreUsage(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
+	goapp.Log.Info().Str("ID", m.ID).Msg("handling restore")
+	req, err := data.DB.LoadRequest(ctx, m.ID)
+	if err != nil {
+		return fmt.Errorf("can't load request: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded request")
+	st, err := data.DB.LoadStatus(ctx, m.ID)
+	if err != nil {
+		return fmt.Errorf("can't load status: %w", err)
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded status")
+	if status.ECServiceError.String() == utils.FromSQLStr(st.ErrorCode) {
+		data.UsageRestorer.Do(ctx, req.ID, req.RequestID, utils.FromSQLStr(st.Error))
+	}
+	goapp.Log.Info().Str("ID", m.ID).Msg("restore done")
 	return nil
 }
 
