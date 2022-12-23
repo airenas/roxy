@@ -272,7 +272,7 @@ func handleClean(ctx context.Context, m *messages.CleanMessage, data *ServiceDat
 }
 
 func isCompleted(st, errStr string) bool {
-	return st == "COMPLETED" || errStr != ""
+	return status.From(st) == status.Completed || errStr != ""
 }
 
 func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error {
@@ -308,12 +308,14 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 				if err != nil {
 					return fmt.Errorf("can't get status: %w", err)
 				}
-				finish, err := processStatus(ctx, d, extID, ID, data)
-				if err != nil {
-					return fmt.Errorf("can't process status: %w", err)
-				}
-				if finish {
-					return nil
+				if isCompleted(d.Status, d.Error) { // send msg only if completed
+					finish, err := processStatus(ctx, d, extID, ID, data)
+					if err != nil {
+						return fmt.Errorf("can't process status: %w", err)
+					}
+					if finish {
+						return nil
+					}
 				}
 			}
 		}

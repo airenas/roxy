@@ -120,3 +120,26 @@ func Test_limit(t *testing.T) {
 		})
 	}
 }
+
+func Test_isCompleted(t *testing.T) {
+	type args struct {
+		st     string
+		errStr string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{name: "Completed", args: args{st: "COMPLETED"}, want: true},
+		{name: "Completed err", args: args{st: "Olia", errStr: "err"}, want: true},
+		{name: "Not completed", args: args{st: "Upload", errStr: ""}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCompleted(tt.args.st, tt.args.errStr); got != tt.want {
+				t.Errorf("isCompleted() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
