@@ -70,24 +70,24 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 }
 
 func sendFailure(ctx context.Context, sender MsgSender, m interface{}) error {
-	am, ok := m.(messages.ASRMessage)
+	qm, ok := m.(amessages.QueueMessage)
 	if !ok {
-		return fmt.Errorf("no ASRMessage")
+		return fmt.Errorf("no QueueMessage")
 	}
-	goapp.Log.Info().Str("ID", am.ID).Msg("sending failure msg")
+	goapp.Log.Info().Str("ID", qm.ID).Msg("sending failure msg")
 	return sender.SendMessage(ctx, amessages.InformMessage{
-		QueueMessage: *amessages.NewQueueMessageFromM(&am.QueueMessage),
+		QueueMessage: *amessages.NewQueueMessageFromM(&qm),
 		Type:         amessages.InformTypeFailed, At: time.Now()}, messages.Inform)
 }
 
 func sendStatusChangeFailure(ctx context.Context, sender MsgSender, m interface{}, errStr string) error {
-	am, ok := m.(messages.ASRMessage)
+	qm, ok := m.(amessages.QueueMessage)
 	if !ok {
-		return fmt.Errorf("no ASRMessage")
+		return fmt.Errorf("no QueueMessage")
 	}
-	goapp.Log.Info().Str("ID", am.ID).Msg("sending failure status change msg")
+	goapp.Log.Info().Str("ID", qm.ID).Msg("sending failure status change msg")
 	return sender.SendMessage(ctx, messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: am.ID, Error: errStr}}, messages.Fail)
+		QueueMessage: amessages.QueueMessage{ID: qm.ID, Error: errStr}}, messages.Fail)
 }
 
 func DefaultOpts() *Opts {
