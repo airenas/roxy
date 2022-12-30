@@ -3,7 +3,7 @@ module github.com/airenas/roxy
 go 1.19
 
 require (
-	github.com/airenas/async-api v1.1.66
+	github.com/airenas/async-api v1.1.67
 	github.com/airenas/go-app v1.0.25
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
