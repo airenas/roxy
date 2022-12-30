@@ -52,10 +52,10 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 		// process error
 		if j.ErrorCount > opts.retryCount {
 			if opts.failureSender != nil {
-				if _err := sendStatusChangeFailure(ctx, opts.failureSender, m, err.Error()); _err != nil {
+				if _err := sendStatusChangeFailure(ctx, opts.failureSender, &m, err.Error()); _err != nil {
 					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send status failure msg")
 				}
-				if _err := sendFailure(ctx, opts.failureSender, m); _err != nil {
+				if _err := sendFailure(ctx, opts.failureSender, &m); _err != nil {
 					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send failure msg")
 				}
 			} else {
@@ -70,24 +70,24 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 }
 
 func sendFailure(ctx context.Context, sender MsgSender, m interface{}) error {
-	qm, ok := m.(amessages.QueueMessage)
+	qm, ok := m.(amessages.Message)
 	if !ok {
-		return fmt.Errorf("no QueueMessage")
+		return fmt.Errorf("no Message (%T)", m)
 	}
-	goapp.Log.Info().Str("ID", qm.ID).Msg("sending failure msg")
-	return sender.SendMessage(ctx, amessages.InformMessage{
-		QueueMessage: *amessages.NewQueueMessageFromM(&qm),
+	goapp.Log.Info().Str("ID", qm.GetID()).Msg("sending failure msg")
+	return sender.SendMessage(ctx, &amessages.InformMessage{
+		QueueMessage: amessages.QueueMessage{ID: qm.GetID()},
 		Type:         amessages.InformTypeFailed, At: time.Now()}, messages.Inform)
 }
 
 func sendStatusChangeFailure(ctx context.Context, sender MsgSender, m interface{}, errStr string) error {
-	qm, ok := m.(amessages.QueueMessage)
+	qm, ok := m.(amessages.Message)
 	if !ok {
-		return fmt.Errorf("no QueueMessage")
+		return fmt.Errorf("no Message (%T)", m)
 	}
-	goapp.Log.Info().Str("ID", qm.ID).Msg("sending failure status change msg")
-	return sender.SendMessage(ctx, messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: qm.ID, Error: errStr}}, messages.Fail)
+	goapp.Log.Info().Str("ID", qm.GetID()).Msg("sending failure status change msg")
+	return sender.SendMessage(ctx, &messages.ASRMessage{
+		QueueMessage: amessages.QueueMessage{ID: qm.GetID(), Error: errStr}}, messages.Fail)
 }
 
 func DefaultOpts() *Opts {

@@ -121,7 +121,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 
 func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) error {
 	goapp.Log.Info().Str("ID", m.ID).Msg("handling asr")
-	err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
+	err := data.MsgSender.SendMessage(ctx, &amessages.InformMessage{
 		QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
 		Type:         amessages.InformTypeStarted, At: time.Now()}, messages.Inform)
 	if err != nil {
@@ -204,26 +204,26 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		return fmt.Errorf("can't save status: %w", err)
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
-	err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
 		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.StatusChange)
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
 	if isCompleted(m.Status, m.Error) {
-		err = data.MsgSender.SendMessage(ctx, messages.CleanMessage{
+		err = data.MsgSender.SendMessage(ctx, &messages.CleanMessage{
 			QueueMessage: amessages.QueueMessage{ID: m.ID}, ExternalID: m.ExternalID},
 			wrkQueuePrefix+wrkStatusClean)
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
-		err := data.MsgSender.SendMessage(ctx, amessages.InformMessage{
+		err := data.MsgSender.SendMessage(ctx, &amessages.InformMessage{
 			QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
 			Type:         getInformFinishType(m.Error), At: time.Now()}, messages.Inform)
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
 		if m.Error != "" {
-			err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+			err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
 				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, wrkQueuePrefix+wrkRestoreUsage)
 			if err != nil {
 				return fmt.Errorf("can't send msg: %w", err)
@@ -268,12 +268,12 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
 	goapp.Log.Info().Str("ID", m.ID).Msg("send status change")
-	err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
 		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.StatusChange)
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
-	err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{
+	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
 		QueueMessage: amessages.QueueMessage{ID: m.ID}}, wrkQueuePrefix+wrkRestoreUsage)
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
@@ -365,7 +365,7 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 
 func processStatus(ctx context.Context, statusData *tapi.StatusData, extID, ID string, data *ServiceData) (bool, error) {
 	goapp.Log.Info().Str("status", statusData.Status).Str("ID", ID).Msg("status")
-	err := data.MsgSender.SendMessage(ctx, messages.StatusMessage{
+	err := data.MsgSender.SendMessage(ctx, &messages.StatusMessage{
 		QueueMessage:     amessages.QueueMessage{ID: ID},
 		Status:           statusData.Status,
 		Error:            statusData.Error,

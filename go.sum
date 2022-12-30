@@ -38,8 +38,8 @@ cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3f
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/airenas/async-api v1.1.67 h1:zx78VI0H5zuAs8zVwr65kQnoDmTrG9X+re/D6qY5e48=
-github.com/airenas/async-api v1.1.67/go.mod h1:ZuoCnO8GtI6pJbaiLqDS284agXIBsqawPUmPKjTBRh0=
+github.com/airenas/async-api v1.2.68 h1:epItBpHFziHSOaO+a+QZnVBwVEQ7wkeSbXXtsoVXzeI=
+github.com/airenas/async-api v1.2.68/go.mod h1:ZuoCnO8GtI6pJbaiLqDS284agXIBsqawPUmPKjTBRh0=
 github.com/airenas/go-app v1.0.25 h1:erGT+GzbnHhoyhtCcjgAYN3bF2vDqCAFbWNsMN7Dfjc=
 github.com/airenas/go-app v1.0.25/go.mod h1:mHLzJ0xCasaSe/1eWJT9jlf8YufR7p95cHlYDX8rtQE=
 github.com/appleboy/gofight/v2 v2.1.2 h1:VOy3jow4vIK8BRQJoC/I9muxyYlJ2yb9ht2hZoS3rf4=

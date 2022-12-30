@@ -189,7 +189,7 @@ func upload(data *Data) func(echo.Context) error {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: rd.ID}}, messages.Upload)
+		err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: rd.ID}}, messages.Upload)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
@@ -213,7 +213,7 @@ func retry(data *Data) func(echo.Context) error {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)
 		}
-		err = data.MsgSender.SendMessage(ctx, messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: id}}, messages.Upload)
+		err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: id}}, messages.Upload)
 		if err != nil {
 			goapp.Log.Error().Err(err).Send()
 			return echo.NewHTTPError(http.StatusInternalServerError)

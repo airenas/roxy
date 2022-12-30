@@ -166,7 +166,7 @@ func testWaitStatus(t *testing.T, id, status string, fail bool) {
 	for {
 		select {
 		case <-tm:
-			require.Failf(t, "Fail", "Not %s(%s) in %v", status, failStr, dur)
+			require.Failf(t, "Fail", "Not %s(%s) in %v (ID:%s)", status, failStr, dur, id)
 		default:
 			st := getStatus(t, id)
 			if st.Status == status && (!fail || st.Error != "") {
