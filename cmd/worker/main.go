@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/airenas/async-api/pkg/miniofs"
+	"github.com/airenas/async-api/pkg/usage"
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
@@ -64,6 +65,11 @@ func main() {
 		cfg.GetString("transcriber.statusUrl"), cfg.GetString("transcriber.resultUrl"), cfg.GetString("transcriber.cleanUrl"))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init transcriber")
+	}
+
+	data.UsageRestorer, err = usage.NewRestorer(cfg.GetString("doorman.URL"))
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
 
 	printBanner()

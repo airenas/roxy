@@ -287,23 +287,26 @@ func handleRestoreUsage(ctx context.Context, m *messages.ASRMessage, data *Servi
 	if err != nil {
 		return fmt.Errorf("can't load request: %w", err)
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded request")
+	goapp.Log.Info().Str("ID", m.ID).Msg("loaded request")
 	st, err := data.DB.LoadStatus(ctx, m.ID)
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded status")
+	goapp.Log.Info().Str("ID", m.ID).Msg("loaded status")
 	if status.ECServiceError.String() == utils.FromSQLStr(st.ErrorCode) {
-		data.UsageRestorer.Do(ctx, req.ID, req.RequestID, utils.FromSQLStr(st.Error))
+		if err := data.UsageRestorer.Do(ctx, req.ID, req.RequestID, utils.FromSQLStr(st.Error)); err != nil {
+			return fmt.Errorf("can't restore: %w", err)
+		}
+		goapp.Log.Info().Str("ID", m.ID).Msg("restore done")
+	} else {
+		goapp.Log.Warn().Str("ID", m.ID).Str("errCode", utils.FromSQLStr(st.ErrorCode)).Msg("restore skip")
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msg("restore done")
 	return nil
 }
 
 func handleClean(ctx context.Context, m *messages.CleanMessage, data *ServiceData) error {
-	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling")
-	err := data.Transcriber.Clean(ctx, m.ExternalID)
-	if err != nil {
+	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling clean")
+	if err := data.Transcriber.Clean(ctx, m.ExternalID); err != nil {
 		return fmt.Errorf("can't clean external data: %w", err)
 	}
 	return nil
@@ -434,6 +437,9 @@ func validate(data *ServiceData) error {
 	}
 	if data.Transcriber == nil {
 		return fmt.Errorf("no Transcriber")
+	}
+	if data.UsageRestorer == nil {
+		return fmt.Errorf("no UsageRestorer")
 	}
 	return nil
 }
