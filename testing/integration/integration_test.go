@@ -24,6 +24,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/jordan-wright/email"
 	"github.com/stretchr/testify/assert"
@@ -50,8 +51,14 @@ type emails struct {
 	lock  *sync.RWMutex
 }
 
+type restores struct {
+	ids  []string
+	lock *sync.RWMutex
+}
+
 var cfg config
 var emailData = emails{lock: &sync.RWMutex{}}
+var restoresData = restores{lock: &sync.RWMutex{}}
 
 func TestMain(m *testing.M) {
 	cfg.uploadURL = GetEnvOrFail("UPLOAD_URL")
@@ -319,6 +326,18 @@ func TestInform_ExtFailure(t *testing.T) {
 	testEmailReceived(t, ur.ID, "Nepavyko")
 }
 
+
+func Test_RestoreReceived(t *testing.T) {
+	t.Parallel()
+	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failStatus"},
+	{"numberOfSpeakers", "1"}})
+	restoreID := "restore123"
+	req.Header.Set("x-doorman-requestid", "asr:"+restoreID)
+	resp := test.Invoke(t, cfg.httpclient, req)
+	test.CheckCode(t, resp, http.StatusOK)
+	testRestoreReceived(t, restoreID)
+}
+
 func TestClean(t *testing.T) {
 	t.Parallel()
 	id := uploadWaitFakeFile(t)
@@ -362,6 +381,28 @@ func testEmailReceived(t *testing.T, id, msgType string) {
 	}
 }
 
+func testRestoreReceived(t *testing.T, id string) {
+	t.Helper()
+	dur := time.Second * 30
+	tm := time.After(dur)
+	for {
+		select {
+		case <-tm:
+			require.Failf(t, "Fail", "Not found restore for %s %v", id, dur)
+		default:
+			restoresData.lock.RLock()
+			for _, rID := range restoresData.ids {
+				if rID == id {
+					restoresData.lock.RUnlock()
+					return
+				}
+			}
+			restoresData.lock.RUnlock()
+			time.Sleep(time.Millisecond * 100)
+		}
+	}
+}
+
 func uploadWaitFakeFile(t *testing.T) string {
 	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "ben"},
 		{"numberOfSpeakers", "1"}})
@@ -401,7 +442,7 @@ func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Re
 	req, err := http.NewRequest(http.MethodPost, cfg.uploadURL+"/upload", body)
 	require.Nil(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("x-doorman-requestid", "m:testRequestID")
+	req.Header.Set("x-doorman-requestid", "asr:" + uuid.NewString())
 	return req
 }
 
@@ -480,8 +521,16 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 			log.Printf("got email: %s, %.50s", email.Subject, goapp.Sanitize(string(email.Text)))
 			emailData.mails = append(emailData.mails, email)
 		default:
-			w.WriteHeader(http.StatusNotFound)
-			log.Printf("Unknown request to: '%s'", r.URL.String())
+			if strings.HasPrefix(r.URL.String(), "/doorman/asr/restore/"){
+				restoresData.lock.Lock()
+				defer restoresData.lock.Unlock()
+				rID := r.URL.String()[len("/doorman/asr/restore/"):]
+				log.Printf("got restore: %s", rID)
+				restoresData.ids = append(restoresData.ids, rID)
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+				log.Printf("Unknown request to: '%s'", r.URL.String())
+			}
 		}
 	}))
 
