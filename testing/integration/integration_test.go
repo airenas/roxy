@@ -480,6 +480,7 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 			log.Printf("got email: %s, %.50s", email.Subject, goapp.Sanitize(string(email.Text)))
 			emailData.mails = append(emailData.mails, email)
 		default:
+			w.WriteHeader(http.StatusNotFound)
 			log.Printf("Unknown request to: '%s'", r.URL.String())
 		}
 	}))

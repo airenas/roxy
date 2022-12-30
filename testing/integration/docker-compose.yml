@@ -34,6 +34,7 @@ services:
       - TRANSCRIBER_STATUSURL=${TRANSCRIPTION_URL}/ausis/status.service
       - TRANSCRIBER_RESULTURL=${TRANSCRIPTION_URL}/ausis/result.service
       - TRANSCRIBER_CLEANURL=${TRANSCRIPTION_URL}/ausis/clean.service
+      - DOORMAN_URL=http://integration-tests:9876/doorman
 
   inform:
     image: airenas/roxy-inform:${inform_version}
