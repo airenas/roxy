@@ -293,7 +293,7 @@ func (sp *Client) Clean(ctx context.Context, ID string) error {
 		func() (interface{}, bool, error) {
 			ctx, cancelF := context.WithTimeout(ctx, sp.timeout)
 			defer cancelF()
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s/%s", sp.cleanURL, "delete", ID), nil)
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", sp.cleanURL, ID), nil)
 			if err != nil {
 				return nil, false, err
 			}

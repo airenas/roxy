@@ -508,7 +508,7 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 		case "/ausis/result.service/audio/" + okID:
 			w.Header().Add("content-disposition", `attachment; filename="res.wav"`)
 			io.Copy(w, strings.NewReader(audioFileContent))
-		case "/ausis/clean.service/delete/" + okID:
+		case "/ausis/clean.service/" + okID:
 			io.Copy(w, strings.NewReader(`OK`))
 		case "/fakeURL":
 			emailData.lock.Lock()
