@@ -16,9 +16,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 #####################################################################################
 FROM alpine:3.16 as runner
 
-EXPOSE 8000
-
-
 ENV UID=999
 RUN addgroup app && adduser -S -G app app --uid $UID app
 
