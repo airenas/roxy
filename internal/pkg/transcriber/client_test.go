@@ -282,21 +282,21 @@ func TestUpload_NoBackoff_Canceled(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	client, _, tReq := initTestServer(t, map[string]testResp{"/10": newTestR(200, "OK")})
+	client, _, tReq := initTestServer(t, map[string]testResp{"/delete/10": newTestR(200, "OK")})
 
 	err := client.Clean(test.Ctx(t), "10")
 
 	assert.Nil(t, err)
-	testCalled(t, "/10", *tReq)
+	testCalled(t, "/delete/10", *tReq)
 }
 
 func TestClean_Fails(t *testing.T) {
-	client, _, tReq := initTestServer(t, map[string]testResp{"/10": newTestR(500, "Error")})
+	client, _, tReq := initTestServer(t, map[string]testResp{"/delete/10": newTestR(500, "Error")})
 	client.backoff = newSimpleBackoff
 	err := client.Clean(test.Ctx(t), "10")
 
 	assert.NotNil(t, err)
-	testCalled(t, "/10", *tReq)
+	testCalled(t, "/delete/10", *tReq)
 	assert.Equal(t, 4, len((*tReq)))
 }
 
