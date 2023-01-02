@@ -237,9 +237,12 @@ func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, e
 	}
 	writer.Close()
 
+	bodyReader := bytes.NewReader(body.Bytes())
+
 	return goapp.InvokeWithBackoff(ctx, func() (string, bool, error) {
 		var respData uploadResponse
-		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, body)
+		_, _ = bodyReader.Seek(0, io.SeekStart)
+		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, bodyReader)
 		if err != nil {
 			return "", false, err
 		}
