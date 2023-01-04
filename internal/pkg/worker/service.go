@@ -132,7 +132,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	if err != nil {
 		return fmt.Errorf("can't load request: %w", err)
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", req)
+	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", req)
 	goapp.Log.Info().Str("ID", m.ID).Msg("load work data")
 	wd, err := data.DB.LoadWorkData(ctx, m.ID)
 	if err != nil {
@@ -167,7 +167,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", status)
+	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", status)
 	if m.AudioReady && !status.AudioReady {
 		goapp.Log.Info().Str("ID", m.ExternalID).Msg("get audio")
 		f, err := data.Transcriber.GetAudio(ctx, m.ExternalID)
@@ -257,7 +257,7 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
-	goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", statusRec)
+	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", statusRec)
 	if statusRec.Error.String != "" {
 		goapp.Log.Info().Str("ID", m.ID).Msg("error set - ignore")
 	}
