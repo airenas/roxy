@@ -37,7 +37,7 @@ type DB interface {
 // Filer retrieves files
 type Filer interface {
 	LoadFile(ctx context.Context, fileName string) (io.ReadSeekCloser, error)
-	SaveFile(ctx context.Context, name string, r io.Reader) error
+	SaveFile(ctx context.Context, name string, r io.Reader, fileSize int64) error
 }
 
 type UsageRestorer interface {
@@ -175,7 +175,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 			return fmt.Errorf("can't get audio: %w", err)
 		}
 		name := filepath.Join(m.ID, m.ID+".mp3") // only such case now supported
-		err = data.Filer.SaveFile(ctx, name, bytes.NewReader(f.Content))
+		err = data.Filer.SaveFile(ctx, name, bytes.NewReader(f.Content), int64(len(f.Content)))
 		if err != nil {
 			return fmt.Errorf("can't save file: %w", err)
 		}
@@ -188,7 +188,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 			if err != nil {
 				return fmt.Errorf("can't get data: %w", err)
 			}
-			err = data.Filer.SaveFile(ctx, fmt.Sprintf("%s/%s", m.ID, f.Name), bytes.NewReader(f.Content))
+			err = data.Filer.SaveFile(ctx, fmt.Sprintf("%s/%s", m.ID, f.Name), bytes.NewReader(f.Content), int64(len(f.Content)))
 			if err != nil {
 				return fmt.Errorf("can't save file: %w", err)
 			}

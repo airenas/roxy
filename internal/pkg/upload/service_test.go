@@ -39,7 +39,7 @@ func initTest(t *testing.T) {
 	tResp = httptest.NewRecorder()
 	dbMock.On("InsertRequest", mock.Anything, mock.Anything).Return(nil)
 	dbMock.On("InsertStatus", mock.Anything, mock.Anything).Return(nil)
-	saverMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	saverMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 }
 
@@ -62,6 +62,7 @@ func Test_Returns(t *testing.T) {
 	bytes, _ := io.ReadAll(resp.Body)
 	assert.Contains(t, string(bytes), `"id":"`)
 	require.Equal(t, len(senderMock.Calls), 1)
+	require.Equal(t, len(saverMock.Calls), 1)
 }
 
 func Test_400(t *testing.T) {
@@ -95,7 +96,7 @@ func Test_Fails_Saver(t *testing.T) {
 	initTest(t)
 	req := newTestRequest("file", "file.wav", "olia", nil)
 	saverMock.ExpectedCalls = nil
-	saverMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("err"))
+	saverMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("err"))
 
 	testCode(t, req, http.StatusInternalServerError)
 }

@@ -32,7 +32,7 @@ import (
 
 // FileSaver provides save file functionality
 type FileSaver interface {
-	SaveFile(ctx context.Context, name string, r io.Reader) error
+	SaveFile(ctx context.Context, name string, r io.Reader, fileSize int64) error
 }
 
 // MsgSender provides send msg functionality
@@ -340,7 +340,7 @@ func saveFiles(ctx context.Context, fs FileSaver, id string, files []multipart.F
 		if err != nil {
 			return fmt.Errorf("can't save '%s': %w", fHeaders[i].Filename, err)
 		}
-		if err = fs.SaveFile(ctx, fn, f); err != nil {
+		if err = fs.SaveFile(ctx, fn, f, fHeaders[i].Size); err != nil {
 			return fmt.Errorf("can't save '%s': %w", fn, err)
 		}
 	}

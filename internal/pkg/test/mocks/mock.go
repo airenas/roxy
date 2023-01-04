@@ -13,8 +13,8 @@ import (
 // Filer is minio mock
 type Filer struct{ mock.Mock }
 
-func (m *Filer) SaveFile(ctx context.Context, name string, r io.Reader) error {
-	args := m.Called(ctx, name, r)
+func (m *Filer) SaveFile(ctx context.Context, name string, r io.Reader, fileSize int64) error {
+	args := m.Called(ctx, name, r, fileSize)
 	return args.Error(0)
 }
 
