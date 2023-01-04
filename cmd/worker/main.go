@@ -12,6 +12,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/transcriber"
+	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/airenas/roxy/internal/pkg/worker"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
@@ -73,6 +74,8 @@ func main() {
 	}
 
 	printBanner()
+
+	go utils.RunPerfEndpoint()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	// data.StopCtx = ctx
