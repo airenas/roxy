@@ -13,6 +13,7 @@ import (
 	"github.com/airenas/roxy/internal/pkg/status"
 	"github.com/airenas/roxy/internal/pkg/test"
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
+	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -90,6 +91,81 @@ func Test_handleRestoreUsage_Fail(t *testing.T) {
 	uRestorerMock.On("Do", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("err"))
 	err := handleRestoreUsage(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
 	assert.NotNil(t, err)
+}
+
+func Test_handleStatus(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		ErrorCode: utils.ToSQLStr(status.ECServiceError.String()), Error: utils.ToSQLStr("st err")}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Starting"}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 1, len(senderMock.Calls))
+	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
+}
+
+func Test_handleStatus_saveAudio(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		ErrorCode: utils.ToSQLStr(status.ECServiceError.String()), Error: utils.ToSQLStr("st err")}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	transcriberMock.On("GetAudio", mock.Anything, mock.Anything).Return(&tapi.FileData{Name: "olia", Content: []byte("Olia data")}, nil)
+	filerMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Starting", AudioReady: true}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 1, len(filerMock.Calls))
+	require.Equal(t, int64(9), filerMock.Calls[0].Arguments[3])
+}
+
+func Test_handleStatus_saveFiles(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		ErrorCode: utils.ToSQLStr(status.ECServiceError.String()), Error: utils.ToSQLStr("st err")}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	transcriberMock.On("GetAudio", mock.Anything, mock.Anything).Return(&tapi.FileData{Name: "olia", Content: []byte("Olia data")}, nil)
+	transcriberMock.On("GetResult", mock.Anything, mock.Anything, mock.Anything).Return(&tapi.FileData{Name: "olia", Content: []byte("res data")}, nil)
+	filerMock.On("SaveFile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Starting", AudioReady: true, AvailableResults: []string{"res.txt"}}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 2, len(filerMock.Calls))
+	require.Equal(t, int64(8), filerMock.Calls[1].Arguments[3])
+}
+
+func Test_handleStatus_completed(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		ErrorCode: utils.ToSQLStr(status.ECServiceError.String()), Error: utils.ToSQLStr("st err")}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "COMPLETED"}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 3, len(senderMock.Calls))
+	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
+	require.Equal(t, wrkQueuePrefix+wrkStatusClean, senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.Inform, senderMock.Calls[2].Arguments[2])
+}
+
+func Test_handleStatus_completedOnError(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		ErrorCode: utils.ToSQLStr(status.ECServiceError.String()), Error: utils.ToSQLStr("st err")}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", ErrorCode: "Service_err", Error: "error"}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 4, len(senderMock.Calls))
+	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
+	require.Equal(t, wrkQueuePrefix+wrkStatusClean, senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.Inform, senderMock.Calls[2].Arguments[2])
+	require.Equal(t, wrkQueuePrefix+wrkRestoreUsage, senderMock.Calls[3].Arguments[2])
 }
 
 func Test_validate(t *testing.T) {
