@@ -7,6 +7,7 @@ import (
 	"github.com/airenas/go-app/pkg/goapp"
 	"github.com/airenas/roxy/internal/pkg/postgres"
 	"github.com/airenas/roxy/internal/pkg/upload"
+	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
@@ -54,6 +55,8 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")
 	}
+
+	go utils.RunPerfEndpoint()
 
 	err = upload.StartWebServer(data)
 	if err != nil {
