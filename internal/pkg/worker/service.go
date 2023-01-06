@@ -161,12 +161,17 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 }
 
 func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceData) error {
-	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling")
+	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Str("status", m.Status).Msg("handling")
 	goapp.Log.Info().Str("ID", m.ID).Msg("load status")
 	status, err := data.DB.LoadStatus(ctx, m.ID)
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
+	if int32(m.Progress) < utils.FromSQLInt32OrZero(status.Progress) {
+		goapp.Log.Warn().Str("ID", m.ID).Str("status", m.Status).Int32("oldProgress", utils.FromSQLInt32OrZero(status.Progress)).Int("progress", m.Progress).Msg("obsolete")
+		return nil
+	}
+
 	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", status)
 	if m.AudioReady && !status.AudioReady {
 		goapp.Log.Info().Str("ID", m.ExternalID).Msg("get audio")
@@ -197,7 +202,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	}
 	status.Error = utils.ToSQLStr(m.Error)
 	status.ErrorCode = utils.ToSQLStr(m.ErrorCode)
-	status.Progress.Int32 = int32(m.Progress)
+	status.Progress = utils.ToSQLInt32(int32(m.Progress))
 	status.Status = m.Status
 	status.RecognizedText = utils.ToSQLStr(limit(m.RecognizedText, 200))
 	if err := data.DB.UpdateStatus(ctx, status); err != nil {
