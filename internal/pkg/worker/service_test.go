@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/api"
@@ -166,6 +167,30 @@ func Test_handleStatus_completedOnError(t *testing.T) {
 	require.Equal(t, wrkQueuePrefix+wrkStatusClean, senderMock.Calls[1].Arguments[2])
 	require.Equal(t, messages.Inform, senderMock.Calls[2].Arguments[2])
 	require.Equal(t, wrkQueuePrefix+wrkRestoreUsage, senderMock.Calls[3].Arguments[2])
+}
+
+func Test_handleStatus_skip(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		Progress: utils.ToSQLInt32(50), Updated: time.Now().Add(-time.Minute)}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", Progress: 40}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 1, len(dbMock.Calls)) // just load
+}
+
+func Test_handleStatus_noSkip_oldRecord(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
+		Progress: utils.ToSQLInt32(50), Updated: time.Now().Add(-60 * time.Minute)}, nil)
+	dbMock.On("UpdateStatus", mock.Anything, mock.Anything).Return(nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleStatus(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", Progress: 40}, srvData)
+	assert.Nil(t, err)
+	require.Equal(t, 2, len(dbMock.Calls)) // with save
 }
 
 func Test_validate(t *testing.T) {

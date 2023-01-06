@@ -167,7 +167,9 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
-	if int32(m.Progress) < utils.FromSQLInt32OrZero(status.Progress) {
+	// do not update if status is older
+	// but make exception if status update was long time ago - maybe retry
+	if int32(m.Progress) < utils.FromSQLInt32OrZero(status.Progress) && status.Updated.After(time.Now().Add(-30*time.Minute)) {
 		goapp.Log.Warn().Str("ID", m.ID).Str("status", m.Status).Int32("oldProgress", utils.FromSQLInt32OrZero(status.Progress)).Int("progress", m.Progress).Msg("obsolete")
 		return nil
 	}
