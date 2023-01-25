@@ -21,9 +21,12 @@ type (
 
 	//WorkData table
 	WorkData struct {
-		ID         string
-		ExternalID string
-		Created    time.Time
+		ID          string
+		ExternalID  string
+		Created     time.Time
+		Transcriber sql.NullString
+		TryCount    int
+		Version     int
 	}
 
 	//Status information table

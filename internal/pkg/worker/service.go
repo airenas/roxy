@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -22,7 +23,7 @@ import (
 
 // MsgSender provides send msg functionality
 type MsgSender interface {
-	SendMessage(context.Context, amessages.Message, string) error
+	SendMessage(context.Context, amessages.Message, *messages.Options) error
 }
 
 // DB provides persistnce functionality
@@ -32,6 +33,7 @@ type DB interface {
 	LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error)
 	InsertWorkData(context.Context, *persistence.WorkData) error
 	UpdateStatus(context.Context, *persistence.Status) error
+	UpdateWorkData(context.Context, *persistence.WorkData) error
 }
 
 // Filer retrieves files
@@ -54,6 +56,12 @@ type Transcriber interface {
 	Clean(ctx context.Context, ID string) error
 }
 
+// TranscriberProvider provides transcriber
+type TranscriberProvider interface {
+	New(key string) (Transcriber, string, error)
+	Get(key string) (Transcriber, error)
+}
+
 // ServiceData keeps data required for service work
 type ServiceData struct {
 	GueClient     *gue.Client
@@ -61,7 +69,7 @@ type ServiceData struct {
 	MsgSender     MsgSender
 	DB            DB
 	Filer         Filer
-	Transcriber   Transcriber
+	TranscriberPr TranscriberProvider
 	UsageRestorer UsageRestorer
 	Testing       bool
 }
@@ -87,13 +95,13 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	}
 
 	wm := gue.WorkMap{
-		wrkUpload: handler.Create(data, handleASR, handler.DefaultOpts().WithFailure(data.MsgSender).
+		wrkUpload: handler.Create(data, handleASR, handler.DefaultOpts[messages.ASRMessage]().WithFailure(asrFailureHandler(data)).
 			WithTimeout(time.Minute*120).WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts().WithFailure(data.MsgSender).
+		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts[messages.StatusMessage]().WithFailure(statusFailureHandler(data)).
 			WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkStatusClean:  handler.Create(data, handleClean, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkStatusFail:   handler.Create(data, handleFailure, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
-		wrkRestoreUsage: handler.Create(data, handleRestoreUsage, handler.DefaultOpts().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusClean:  handler.Create(data, handleClean, handler.DefaultOpts[messages.CleanMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkStatusFail:   handler.Create(data, handleFailure, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+		wrkRestoreUsage: handler.Create(data, handleRestoreUsage, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 	}
 
 	pool, err := gue.NewWorkerPool(
@@ -123,7 +131,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	goapp.Log.Info().Str("ID", m.ID).Msg("handling asr")
 	err := data.MsgSender.SendMessage(ctx, &amessages.InformMessage{
 		QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
-		Type:         amessages.InformTypeStarted, At: time.Now()}, messages.Inform)
+		Type:         amessages.InformTypeStarted, At: time.Now()}, messages.DefaultOpts(messages.Inform))
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
@@ -138,21 +146,58 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	if err != nil {
 		return fmt.Errorf("can't load work data: %w", err)
 	}
+	oldSrv := utils.FromSQLStr(wd.Transcriber)
+	transcriber, trSrv, err := data.TranscriberPr.New(oldSrv)
+	if err != nil {
+		return fmt.Errorf("can't get transcriber: %w", err)
+	}
+	if transcriber == nil {
+		goapp.Log.Info().Str("ID", m.ID).Msg("no available transcribers")
+		maxWaitTime := time.Hour * 12
+		if req.Created.Add(maxWaitTime).Before(time.Now()) {
+			goapp.Log.Info().Str("ID", m.ID).Msg("already to late")
+			return fmt.Errorf("no available transcriber in %s, added %s", maxWaitTime.String(), req.Created.Format(time.RFC3339))
+		}
+		// sleep 1 min
+		err := data.MsgSender.SendMessage(ctx, m, messages.DefaultOpts(messages.Upload).Delay(time.Minute))
+		if err != nil {
+			return fmt.Errorf("can't send msg: %w", err)
+		}
+		return nil
+	}
+
 	if wd == nil {
-		extID, err := upload(ctx, req, data)
+		extID, err := upload(ctx, req, transcriber, data)
 		if err != nil {
 			return fmt.Errorf("can't upload: %w", err)
 		}
-		wd = &persistence.WorkData{ID: req.ID, ExternalID: extID, Created: time.Now()}
+		wd = &persistence.WorkData{ID: req.ID, ExternalID: extID, Created: time.Now(),
+			Transcriber: utils.ToSQLStr(trSrv), TryCount: 1}
 		err = data.DB.InsertWorkData(ctx, wd)
 		if err != nil {
 			return fmt.Errorf("can't save work data: %w", err)
 		}
-	} else {
+	} else if oldSrv != trSrv {
+		if wd.TryCount > 3 {
+			goapp.Log.Info().Str("ID", m.ID).Msg("too many retries")
+			return fmt.Errorf("too many retries: %d", wd.TryCount)
+		}
+		goapp.Log.Info().Str("ID", m.ID).Str("old", oldSrv).Str("new", trSrv).Msgf("try new srv")
+		extID, err := upload(ctx, req, transcriber, data)
+		if err != nil {
+			return fmt.Errorf("can't upload: %w", err)
+		}
+		wd.ExternalID = extID
+		wd.Transcriber = utils.ToSQLStr(trSrv)
+		wd.TryCount += 1
+		err = data.DB.UpdateWorkData(ctx, wd)
+		if err != nil {
+			return fmt.Errorf("can't update work data: %w", err)
+		}
 		goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", wd)
 	}
 	// wait for finish
-	err = waitStatus(ctx, wd.ID, wd.ExternalID, data)
+	err = waitStatus(ctx, wd, data)
 	if err != nil {
 		return fmt.Errorf("can't wait for finish: %w", err)
 	}
@@ -160,8 +205,70 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	return nil
 }
 
+func asrFailureHandler(data *ServiceData) func(context.Context, *messages.ASRMessage, error) error {
+	return func(ctx context.Context, m *messages.ASRMessage, err error) error {
+		if _err := sendStatusChangeFailure(ctx, data.MsgSender, m.ID, err.Error()); _err != nil {
+			goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send status failure msg")
+		}
+		if _err := sendFailure(ctx, data.MsgSender, m.ID); _err != nil {
+			goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send failure msg")
+		}
+		return nil
+	}
+}
+
+type errTranscriber struct {
+	err error
+}
+
+func (e *errTranscriber) Error() string {
+	return fmt.Sprintf("transcriber error: %v", e.err)
+}
+
+func (e *errTranscriber) Unwrap() error {
+	return e.err
+}
+
+func statusFailureHandler(data *ServiceData) func(context.Context, *messages.StatusMessage, error) error {
+	return func(ctx context.Context, m *messages.StatusMessage, err error) error {
+		if errors.Is(err, &errTranscriber{}) {
+			goapp.Log.Info().Str("ID", m.ID).Msg("retry transcription - transcriber result retrieve error")
+			err := data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
+				QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.Upload))
+			if err != nil {
+				return fmt.Errorf("can't send msg: %w", err)
+			}
+		} else {
+			if _err := sendStatusChangeFailure(ctx, data.MsgSender, m.ID, err.Error()); _err != nil {
+				goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send status failure msg")
+			}
+			if _err := sendFailure(ctx, data.MsgSender, m.ID); _err != nil {
+				goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send failure msg")
+			}
+		}
+		return nil
+	}
+}
+
+func sendFailure(ctx context.Context, sender MsgSender, ID string) error {
+	goapp.Log.Info().Str("ID", ID).Msg("sending failure msg")
+	return sender.SendMessage(ctx, &amessages.InformMessage{
+		QueueMessage: amessages.QueueMessage{ID: ID},
+		Type:         amessages.InformTypeFailed, At: time.Now()}, messages.DefaultOpts(messages.Inform))
+}
+
+func sendStatusChangeFailure(ctx context.Context, sender MsgSender, ID string, errStr string) error {
+	goapp.Log.Info().Str("ID", ID).Msg("sending failure status change msg")
+	return sender.SendMessage(ctx, &messages.ASRMessage{
+		QueueMessage: amessages.QueueMessage{ID: ID, Error: errStr}}, messages.DefaultOpts(messages.Fail))
+}
+
 func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceData) error {
 	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Str("status", m.Status).Msg("handling")
+	transcriber, err := data.TranscriberPr.Get(m.Transcriber)
+	if err != nil {
+		return fmt.Errorf("can't get active transcriber by `%s`: %w", m.Transcriber, err)
+	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("load status")
 	status, err := data.DB.LoadStatus(ctx, m.ID)
 	if err != nil {
@@ -177,9 +284,9 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", status)
 	if m.AudioReady && !status.AudioReady {
 		goapp.Log.Info().Str("ID", m.ExternalID).Msg("get audio")
-		f, err := data.Transcriber.GetAudio(ctx, m.ExternalID)
+		f, err := transcriber.GetAudio(ctx, m.ExternalID)
 		if err != nil {
-			return fmt.Errorf("can't get audio: %w", err)
+			return &errTranscriber{err: fmt.Errorf("can't get audio: %w", err)}
 		}
 		name := filepath.Join(m.ID, m.ID+".mp3") // only such case now supported
 		err = data.Filer.SaveFile(ctx, name, bytes.NewReader(f.Content), int64(len(f.Content)))
@@ -191,9 +298,9 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	if len(m.AvailableResults) != len(status.AvailableResults) {
 		for _, fn := range m.AvailableResults {
 			goapp.Log.Info().Str("ID", m.ID).Str("file", fn).Msg("get data")
-			f, err := data.Transcriber.GetResult(ctx, m.ExternalID, fn)
+			f, err := transcriber.GetResult(ctx, m.ExternalID, fn)
 			if err != nil {
-				return fmt.Errorf("can't get data: %w", err)
+				return &errTranscriber{err: fmt.Errorf("can't get data: %w", err)}
 			}
 			err = data.Filer.SaveFile(ctx, fmt.Sprintf("%s/%s", m.ID, f.Name), bytes.NewReader(f.Content), int64(len(f.Content)))
 			if err != nil {
@@ -212,26 +319,27 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
 	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.StatusChange)
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.StatusChange))
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
 	if isCompleted(m.Status, m.Error) {
 		err = data.MsgSender.SendMessage(ctx, &messages.CleanMessage{
-			QueueMessage: amessages.QueueMessage{ID: m.ID}, ExternalID: m.ExternalID},
-			wrkQueuePrefix+wrkStatusClean)
+			QueueMessage: amessages.QueueMessage{ID: m.ID},
+			ExternalID:   m.ExternalID, Transcriber: m.Transcriber},
+			messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean))
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
 		err := data.MsgSender.SendMessage(ctx, &amessages.InformMessage{
 			QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage),
-			Type:         getInformFinishType(m.Error), At: time.Now()}, messages.Inform)
+			Type:         getInformFinishType(m.Error), At: time.Now()}, messages.DefaultOpts(messages.Inform))
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
 		if m.Error != "" {
 			err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, wrkQueuePrefix+wrkRestoreUsage)
+				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage))
 			if err != nil {
 				return fmt.Errorf("can't send msg: %w", err)
 			}
@@ -276,12 +384,12 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	goapp.Log.Info().Str("ID", m.ID).Msg("Status update completed")
 	goapp.Log.Info().Str("ID", m.ID).Msg("send status change")
 	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.StatusChange)
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.StatusChange))
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
 	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: m.ID}}, wrkQueuePrefix+wrkRestoreUsage)
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage))
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
@@ -313,7 +421,12 @@ func handleRestoreUsage(ctx context.Context, m *messages.ASRMessage, data *Servi
 
 func handleClean(ctx context.Context, m *messages.CleanMessage, data *ServiceData) error {
 	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling clean")
-	if err := data.Transcriber.Clean(ctx, m.ExternalID); err != nil {
+	transcriber, err := data.TranscriberPr.Get(m.Transcriber)
+	if err != nil {
+		return fmt.Errorf("can't get active transcriber by `%s`: %w", m.Transcriber, err)
+	}
+
+	if err := transcriber.Clean(ctx, m.ExternalID); err != nil {
 		return fmt.Errorf("can't clean external data: %w", err)
 	}
 	return nil
@@ -323,9 +436,13 @@ func isCompleted(st, errStr string) bool {
 	return status.From(st) == status.Completed || errStr != ""
 }
 
-func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error {
+func waitStatus(ctx context.Context, wd *persistence.WorkData, data *ServiceData) error {
+	transcriber, err := data.TranscriberPr.Get(utils.FromSQLStr(wd.Transcriber))
+	if err != nil {
+		return fmt.Errorf("can't get transcriber %s: %w", utils.FromSQLStr(wd.Transcriber), err)
+	}
 	manualCheck := time.Second * 20
-	stCh, cf, err := data.Transcriber.HookToStatus(ctx, extID)
+	stCh, cf, err := transcriber.HookToStatus(ctx, wd.ExternalID)
 	if err != nil {
 		return fmt.Errorf("can't hook to status: %w", err)
 	}
@@ -341,7 +458,7 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 					goapp.Log.Info().Msg("closed status channel")
 					return nil
 				}
-				finish, err := processStatus(ctx, &d, extID, ID, data)
+				finish, err := processStatus(ctx, &d, wd, data)
 				if err != nil {
 					return fmt.Errorf("can't process status: %w", err)
 				}
@@ -352,12 +469,12 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 		case <-time.After(manualCheck):
 			{
 				goapp.Log.Info().Msg("manual status check")
-				d, err := data.Transcriber.GetStatus(ctx, extID)
+				d, err := transcriber.GetStatus(ctx, wd.ExternalID)
 				if err != nil {
 					return fmt.Errorf("can't get status: %w", err)
 				}
 				if isCompleted(d.Status, d.Error) { // send msg only if completed
-					finish, err := processStatus(ctx, d, extID, ID, data)
+					finish, err := processStatus(ctx, d, wd, data)
 					if err != nil {
 						return fmt.Errorf("can't process status: %w", err)
 					}
@@ -370,10 +487,10 @@ func waitStatus(ctx context.Context, ID, extID string, data *ServiceData) error 
 	}
 }
 
-func processStatus(ctx context.Context, statusData *tapi.StatusData, extID, ID string, data *ServiceData) (bool, error) {
-	goapp.Log.Info().Str("status", statusData.Status).Str("ID", ID).Msg("status")
+func processStatus(ctx context.Context, statusData *tapi.StatusData, wd *persistence.WorkData, data *ServiceData) (bool, error) {
+	goapp.Log.Info().Str("status", statusData.Status).Str("ID", wd.ID).Msg("status")
 	err := data.MsgSender.SendMessage(ctx, &messages.StatusMessage{
-		QueueMessage:     amessages.QueueMessage{ID: ID},
+		QueueMessage:     amessages.QueueMessage{ID: wd.ID},
 		Status:           statusData.Status,
 		Error:            statusData.Error,
 		Progress:         statusData.Progress,
@@ -381,15 +498,16 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, extID, ID s
 		AudioReady:       statusData.AudioReady,
 		AvailableResults: statusData.AvResults,
 		RecognizedText:   statusData.RecognizedText,
-		ExternalID:       extID,
-	}, wrkQueuePrefix+wrkStatusQueue)
+		ExternalID:       wd.ExternalID,
+		Transcriber:      utils.FromSQLStr(wd.Transcriber),
+	}, messages.DefaultOpts(wrkQueuePrefix+wrkStatusQueue))
 	if err != nil {
 		return false, fmt.Errorf("can't send msg: %w", err)
 	}
 	return isCompleted(statusData.Status, statusData.Error), nil
 }
 
-func upload(ctx context.Context, req *persistence.ReqData, data *ServiceData) (string, error) {
+func upload(ctx context.Context, req *persistence.ReqData, transcriber Transcriber, data *ServiceData) (string, error) {
 	goapp.Log.Info().Str("ID", req.ID).Msg("load file")
 	filesMap := map[string]io.Reader{}
 	files := []io.ReadCloser{}
@@ -408,7 +526,7 @@ func upload(ctx context.Context, req *persistence.ReqData, data *ServiceData) (s
 		goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
 	}
 	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
-	extID, err := data.Transcriber.Upload(ctx, &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap})
+	extID, err := transcriber.Upload(ctx, &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap})
 	if err != nil {
 		return "", fmt.Errorf("can't upload: %w", err)
 	}
@@ -442,8 +560,8 @@ func validate(data *ServiceData) error {
 	if data.DB == nil {
 		return fmt.Errorf("no DB")
 	}
-	if data.Transcriber == nil {
-		return fmt.Errorf("no Transcriber")
+	if data.TranscriberPr == nil {
+		return fmt.Errorf("no TranscriberProvider")
 	}
 	if data.UsageRestorer == nil {
 		return fmt.Errorf("no UsageRestorer")

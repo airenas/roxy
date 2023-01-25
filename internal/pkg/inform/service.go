@@ -41,7 +41,7 @@ type DB interface {
 
 // MsgSender provides send msg functionality
 type MsgSender interface {
-	SendMessage(context.Context, amessages.Message, string) error
+	SendMessage(context.Context, amessages.Message, messages.Options) error
 }
 
 // ServiceData keeps data required for service work
@@ -63,7 +63,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	goapp.Log.Info().Int("workers", data.WorkerCount).Str("queue", messages.Inform).Msg("Starting listen for messages")
 
 	wm := gue.WorkMap{
-		messages.Inform: handler.Create(data, handleInform, handler.DefaultOpts()),
+		messages.Inform: handler.Create(data, handleInform, handler.DefaultOpts[amessages.InformMessage]()),
 	}
 
 	pool, err := gue.NewWorkerPool(

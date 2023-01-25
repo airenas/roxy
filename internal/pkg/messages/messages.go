@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"time"
+
 	amessages "github.com/airenas/async-api/pkg/messages"
 )
 
@@ -27,7 +29,8 @@ type ASRMessage struct {
 // CleanMessage message to clean external data
 type CleanMessage struct {
 	amessages.QueueMessage
-	ExternalID string `json:"extID,omitempty"`
+	ExternalID  string `json:"extID,omitempty"`
+	Transcriber string `json:"transcriber,omitempty"`
 }
 
 // NewMessageFrom creates a copy of a message
@@ -46,4 +49,21 @@ type StatusMessage struct {
 	AvailableResults []string `json:"avResults,omitempty"`
 	ExternalID       string   `json:"extID,omitempty"`
 	RecognizedText   string   `json:"recognizedText,omitempty"`
+
+	Transcriber string `json:"transcriber,omitempty"`
+}
+
+// ASRMessage main message passing through in roxy asr system
+type Options struct {
+	Queue string
+	After time.Duration
+}
+
+func DefaultOpts(queue string) *Options {
+	return &Options{Queue: queue}
+}
+
+func (opt *Options) Delay(after time.Duration) *Options {
+	opt.After = after
+	return opt
 }

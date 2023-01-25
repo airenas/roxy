@@ -55,8 +55,8 @@ func (db *DB) LoadRequest(ctx context.Context, id string) (*persistence.ReqData,
 // LoadWorkData loads work info from DB
 func (db *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error) {
 	var res persistence.WorkData
-	err := db.pool.QueryRow(ctx, `SELECT id, external_id, created FROM work_data
-		WHERE id = $1`, id).Scan(&res.ID, &res.ExternalID, &res.Created)
+	err := db.pool.QueryRow(ctx, `SELECT id, external_id, created, transcriber_url, try_count, version FROM work_data
+		WHERE id = $1`, id).Scan(&res.ID, &res.ExternalID, &res.Created, &res.Transcriber, &res.TryCount, &res.Version)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -68,12 +68,29 @@ func (db *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkDat
 
 // InsertWorkData inserts data into DB
 func (db *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) error {
-	rows, err := db.pool.Query(ctx, `INSERT INTO work_data(id, external_id, created) 
-	VALUES($1, $2, $3)`, data.ID, data.ExternalID, data.Created)
+	rows, err := db.pool.Query(ctx, `INSERT INTO work_data(id, external_id, transcriber_url, try_count, created) 
+	VALUES($1, $2, $3, $4, $5)`, data.ID, data.ExternalID, data.Transcriber, data.TryCount, data.Created)
 	if err != nil {
 		return fmt.Errorf("can't insert work_data: %w", err)
 	}
 	defer rows.Close()
+	return nil
+}
+
+// UpdateWorkData updates workdata
+func (db *DB) UpdateWorkData(ctx context.Context, data *persistence.WorkData) error {
+	rows, err := db.pool.Exec(ctx, `UPDATE work_data SET 
+	external_id = $3, 
+	transcriber_url = $4,
+	try_count = $5,
+	version = $2 + 1 
+	WHERE id = $1 and version = $2`, data.ID, data.Version, data.ExternalID, data.Transcriber, data.TryCount)
+	if err != nil {
+		return fmt.Errorf("can't update work_data: %w", err)
+	}
+	if rows.RowsAffected() != 1 {
+		return fmt.Errorf("can't update work_data, no records found")
+	}
 	return nil
 }
 
