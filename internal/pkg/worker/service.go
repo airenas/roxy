@@ -46,20 +46,9 @@ type UsageRestorer interface {
 	Do(ctx context.Context, msgID, reqID, errStr string) error
 }
 
-// Transcriber provides transcription
-type Transcriber interface {
-	Upload(ctx context.Context, audio *tapi.UploadData) (string, error)
-	HookToStatus(ctx context.Context, ID string) (<-chan tapi.StatusData, func(), error)
-	GetStatus(ctx context.Context, ID string) (*tapi.StatusData, error)
-	GetAudio(ctx context.Context, ID string) (*tapi.FileData, error)
-	GetResult(ctx context.Context, ID, name string) (*tapi.FileData, error)
-	Clean(ctx context.Context, ID string) error
-}
-
 // TranscriberProvider provides transcriber
 type TranscriberProvider interface {
-	New(key string) (Transcriber, string, error)
-	Get(key string) (Transcriber, error)
+	Get(key string, allowOther bool) (tapi.Transcriber, string, error)
 }
 
 // ServiceData keeps data required for service work
@@ -147,7 +136,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 		return fmt.Errorf("can't load work data: %w", err)
 	}
 	oldSrv := utils.FromSQLStr(wd.Transcriber)
-	transcriber, trSrv, err := data.TranscriberPr.New(oldSrv)
+	transcriber, trSrv, err := data.TranscriberPr.Get(oldSrv, true)
 	if err != nil {
 		return fmt.Errorf("can't get transcriber: %w", err)
 	}
@@ -265,7 +254,7 @@ func sendStatusChangeFailure(ctx context.Context, sender MsgSender, ID string, e
 
 func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceData) error {
 	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Str("status", m.Status).Msg("handling")
-	transcriber, err := data.TranscriberPr.Get(m.Transcriber)
+	transcriber, _, err := data.TranscriberPr.Get(m.Transcriber, false)
 	if err != nil {
 		return fmt.Errorf("can't get active transcriber by `%s`: %w", m.Transcriber, err)
 	}
@@ -421,7 +410,7 @@ func handleRestoreUsage(ctx context.Context, m *messages.ASRMessage, data *Servi
 
 func handleClean(ctx context.Context, m *messages.CleanMessage, data *ServiceData) error {
 	goapp.Log.Info().Str("ID", m.ID).Str("extID", m.ExternalID).Msg("handling clean")
-	transcriber, err := data.TranscriberPr.Get(m.Transcriber)
+	transcriber, _, err := data.TranscriberPr.Get(m.Transcriber, false)
 	if err != nil {
 		return fmt.Errorf("can't get active transcriber by `%s`: %w", m.Transcriber, err)
 	}
@@ -437,7 +426,7 @@ func isCompleted(st, errStr string) bool {
 }
 
 func waitStatus(ctx context.Context, wd *persistence.WorkData, data *ServiceData) error {
-	transcriber, err := data.TranscriberPr.Get(utils.FromSQLStr(wd.Transcriber))
+	transcriber, _, err := data.TranscriberPr.Get(utils.FromSQLStr(wd.Transcriber), false)
 	if err != nil {
 		return fmt.Errorf("can't get transcriber %s: %w", utils.FromSQLStr(wd.Transcriber), err)
 	}
@@ -507,7 +496,7 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, wd *persist
 	return isCompleted(statusData.Status, statusData.Error), nil
 }
 
-func upload(ctx context.Context, req *persistence.ReqData, transcriber Transcriber, data *ServiceData) (string, error) {
+func upload(ctx context.Context, req *persistence.ReqData, transcriber tapi.Transcriber, data *ServiceData) (string, error) {
 	goapp.Log.Info().Str("ID", req.ID).Msg("load file")
 	filesMap := map[string]io.Reader{}
 	files := []io.ReadCloser{}
