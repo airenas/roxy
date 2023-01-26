@@ -104,6 +104,75 @@ func waitForDB(ctx context.Context, URL string) {
 	}
 }
 
+const consulData = `
+{
+    "Datacenter": "dc1",
+    "ID": "9f735e1d-5696-4cc2-a4d6-5040ad1c449f",
+    "Node": "n1",
+    "Address": "127.0.0.1",
+    "TaggedAddresses": {
+      "lan": "127.0.0.1",
+      "wan": "127.0.0.1"
+    },
+    "NodeMeta": {
+      "external-node": "true",
+      "external-probe": "true"
+    },
+    "Service": {
+      "ID": "asr1",
+      "Service": "asr",
+      "Tags": [
+        "olia",
+        ""
+      ],
+      "Meta": {
+        "uploadURL": "ausis/transcriber/upload",
+		"statusURL": "ausis/status.service",
+		"resultURL": "ausis/result.service",
+		"cleanURL": "ausis/clean.service"
+      },
+      "Address": "integration-tests",
+      "Port": 9876
+    },
+    "Checks": [{
+      "Node": "n1",
+      "CheckID": "am:live",
+      "Name": "AM Live check",
+      "Notes": "",
+      "ServiceID": "asr1",
+      "Status": "passing",
+      "Definition": {
+        "HTTP": "http://127.0.0.1:8055/live",
+        "Interval": "30s",
+        "Timeout": "5s",
+        "DeregisterCriticalServiceAfter": "1m",
+        "Failures_before_critical": 3
+      }
+    }]
+  }
+`
+
+func registerToConsul(ctx context.Context, URL string) {
+	log.Printf("Registering: %s", URL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, URL, strings.NewReader(consulData))
+	if err != nil {
+		log.Fatalf("FAIL: can't register to consul: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalf("FAIL: can't register to consul: %v", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		log.Fatalf("FAIL: can't register to consul: %d, %s", resp.StatusCode, string(b))
+	}
+}
+
 func handleStatusWS(rw http.ResponseWriter, req *http.Request, connf func(*websocket.Conn)) {
 	upgrader := websocket.Upgrader{}
 	c, err := upgrader.Upgrade(rw, req, nil)

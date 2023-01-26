@@ -27,14 +27,26 @@ services:
     environment:
       - WORKER_COUNT=1
       - WORKER_TESTING=true
+      - WORKER_CHECKREGISTRY=5s
+      - WORKER_RETRYDELAY=5s
       - FILER_URL=minio:9000
       - FILER_KEY=${MINIO_PASS}
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
-      - TRANSCRIBER_UPLOADURL=${TRANSCRIPTION_URL}/ausis/transcriber/upload
-      - TRANSCRIBER_STATUSURL=${TRANSCRIPTION_URL}/ausis/status.service
-      - TRANSCRIBER_RESULTURL=${TRANSCRIPTION_URL}/ausis/result.service
-      - TRANSCRIBER_CLEANURL=${TRANSCRIPTION_URL}/ausis/clean.service
+      # - TRANSCRIBER_UPLOADURL=${TRANSCRIPTION_URL}/ausis/transcriber/upload
+      # - TRANSCRIBER_STATUSURL=${TRANSCRIPTION_URL}/ausis/status.service
+      # - TRANSCRIBER_RESULTURL=${TRANSCRIPTION_URL}/ausis/result.service
+      # - TRANSCRIBER_CLEANURL=${TRANSCRIPTION_URL}/ausis/clean.service
       - DOORMAN_URL=http://integration-tests:9876/doorman
+      - CONSUL_HTTP_ADDR=consul:8500
+  
+  consul:
+    image: hashicorp/consul:1.14
+    restart: on-failure
+    ports:
+      - "8500:8500"
+    command: "agent"
+    volumes:
+     - ./cfg/consul/server.json:/consul/config/server.json:ro
 
   inform:
     image: airenas/roxy-inform:${inform_version}
@@ -80,12 +92,14 @@ services:
     depends_on:
       - upload
       - db
+      - consul
     environment:
       - UPLOAD_URL=http://upload:8000  
       - STATUS_URL=http://status:8000
       - RESULT_URL=http://result:8000
       - CLEAN_URL=http://clean:8000  
-      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable   
+      - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
+      - CONSUL_URL=http://consul:8500   
     volumes:
       - ../../:/go/src/
     command: -tags integration -v -count=1 ./testing/integration/...      
@@ -95,7 +109,7 @@ services:
     restart: on-failure
     volumes:
     #   - db-data:/var/lib/postgresql/data
-    - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    - ./cfg/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     environment:
       - POSTGRES_PASSWORD=${PSQL_PASS}
       - POSTGRES_INITDB_ARGS=--auth=password
