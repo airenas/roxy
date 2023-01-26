@@ -11,6 +11,14 @@ import (
 	"github.com/airenas/roxy/internal/pkg/transcriber"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/hashicorp/consul/api"
+	"go.uber.org/multierr"
+)
+
+const (
+	uploadKey = "uploadURL"
+	statusKey = "statusURL"
+	resultKey = "resultURL"
+	cleanKey  = "cleanURL"
 )
 
 type Provider struct {
@@ -82,15 +90,13 @@ func (c *Provider) StartCheckLoop(ctx context.Context, checkInterval time.Durati
 func (c *Provider) serviceLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	// run on startup
-	err := c.check(ctx)
-	if err != nil {
+	if err := c.check(ctx); err != nil {
 		goapp.Log.Error().Err(err).Send()
 	}
 	for {
 		select {
 		case <-ticker.C:
-			err := c.check(ctx)
-			if err != nil {
+			if err := c.check(ctx); err != nil {
 				goapp.Log.Error().Err(err).Send()
 			}
 		case <-ctx.Done():
@@ -132,22 +138,23 @@ func (c *Provider) updateSrv(srvs []*api.ServiceEntry) error {
 		return nil
 	}
 	c.trans = new
+	var err error
 	for v, k := range ms {
-		tr, err := newTranscriber(v, k)
-		if err != nil {
-			return err
+		tr, errInt := newTranscriber(v, k)
+		if errInt != nil {
+			err = multierr.Append(err, errInt)
+			continue
 		}
 		c.trans = append(c.trans, tr)
 		goapp.Log.Info().Str("service", v).Msg("added transcriber")
 	}
-	return nil
+	return err
 }
 
-
 func newTranscriber(v string, s *api.ServiceEntry) (*trWrap, error) {
-	tr, err := transcriber.NewClient(getUrl(s, "upload"), getUrl(s, "status"), getUrl(s, "result"), getUrl(s, "clean"))
+	tr, err := transcriber.NewClient(getUrl(s, uploadKey), getUrl(s, statusKey), getUrl(s, resultKey), getUrl(s, cleanKey))
 	if err != nil {
-		return nil, fmt.Errorf("can't init transcriber for %s", v)
+		return nil, fmt.Errorf("can't init transcriber for %s: %v", v, err)
 	}
 	res := &trWrap{real: tr, srv: v, key: fullKey(s)}
 	return res, nil
@@ -167,10 +174,10 @@ func key(s *api.ServiceEntry) string {
 
 func fullKey(s *api.ServiceEntry) string {
 	res := strings.Builder{}
-	for _, key := range [...]string{"upload", "status", "result", "clean"} {
+	for _, key := range [...]string{uploadKey, statusKey, resultKey, cleanKey} {
 		v, ok := s.Service.Meta[key]
 		if ok {
-			res.WriteString(key + ":" + v)
+			res.WriteString(key + ":" + v + ",")
 		}
 	}
 	return res.String()

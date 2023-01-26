@@ -91,7 +91,7 @@ func TestProvider_updateSrv_no_meta(t *testing.T) {
 func TestProvider_updateSrv_adds(t *testing.T) {
 	p := newProvider(nil)
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 }
@@ -99,12 +99,12 @@ func TestProvider_updateSrv_adds(t *testing.T) {
 func TestProvider_updateSrv_addsSame(t *testing.T) {
 	p := newProvider(nil)
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 	cp := p.trans[0]
 	err = p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 	assert.Equal(t, cp, p.trans[0])
@@ -113,12 +113,12 @@ func TestProvider_updateSrv_addsSame(t *testing.T) {
 func TestProvider_updateSrv_updates(t *testing.T) {
 	p := newProvider(nil)
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 	cp := p.trans[0]
 	err = p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "upload/", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "upload/", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 	assert.NotEqual(t, cp, p.trans[0])
@@ -127,13 +127,13 @@ func TestProvider_updateSrv_updates(t *testing.T) {
 func TestProvider_updateSrv_addsTwo(t *testing.T) {
 	p := newProvider(nil)
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(p.trans))
 	err = p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 81, Address: "srv",
-		Meta: map[string]string{"upload": "upload/", "status": "st", "result": "res", "clean": "cl"}}},
+		Meta: map[string]string{uploadKey: "upload/", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 		{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-			Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(p.trans))
 }
@@ -141,19 +141,19 @@ func TestProvider_updateSrv_addsTwo(t *testing.T) {
 func TestProvider_updateSrv_drops(t *testing.T) {
 	p := newProvider(nil)
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-		Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}},
+		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 		{Service: &api.AgentService{Service: "olia", Port: 81, Address: "srv",
-			Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}},
+			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 		{Service: &api.AgentService{Service: "olia", Port: 82, Address: "srv",
-			Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}}})
+			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(p.trans))
 	c1, c2 := p.trans[0], p.trans[2]
 	err = p.updateSrv([]*api.ServiceEntry{
 		{Service: &api.AgentService{Service: "olia", Port: 82, Address: "srv",
-			Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}},
+			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 		{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
-			Meta: map[string]string{"upload": "up", "status": "st", "result": "res", "clean": "cl"}}},
+			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(p.trans))
