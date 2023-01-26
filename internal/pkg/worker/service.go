@@ -137,6 +137,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	if err != nil {
 		return fmt.Errorf("can't load work data: %w", err)
 	}
+	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", wd)
 	oldSrv := ""
 	if wd != nil {
 		oldSrv = utils.FromSQLStr(wd.Transcriber)
@@ -188,7 +189,16 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 		if err != nil {
 			return fmt.Errorf("can't update work data: %w", err)
 		}
-		goapp.Log.Info().Str("ID", m.ID).Msgf("loaded %v", wd)
+	} else {
+		if wd.TryCount > 5 {
+			goapp.Log.Info().Str("ID", m.ID).Msg("too many retries for same transcriber")
+			return fmt.Errorf("too many retries: %d", wd.TryCount)
+		}
+		wd.TryCount += 1
+		err = data.DB.UpdateWorkData(ctx, wd)
+		if err != nil {
+			return fmt.Errorf("can't update work data: %w", err)
+		}
 	}
 	// wait for finish
 	err = waitStatus(ctx, wd, data)

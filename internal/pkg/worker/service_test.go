@@ -44,6 +44,7 @@ func initTest(t *testing.T) {
 	transcriberMock.On("Clean", mock.Anything, mock.Anything).Return(nil)
 	uRestorerMock.On("Do", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	transcriberPrMock.On("Get", mock.Anything, mock.Anything).Return(transcriberMock, "http://srv:8080", nil)
+	dbMock.On("UpdateWorkData", mock.Anything, mock.Anything).Return(nil)
 }
 
 func Test_handleASR_delay(t *testing.T) {
@@ -79,6 +80,17 @@ func Test_handleASR_fail_tooManyRetries(t *testing.T) {
 	err := handleASR(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
 	require.NotNil(t, err)
 	assert.Contains(t, err.Error(), "too many retries: 4")
+}
+
+func Test_handleASR_fail_sameTooManyRetries(t *testing.T) {
+	initTest(t)
+	dbMock.On("LoadRequest", mock.Anything, mock.Anything).Return(&persistence.ReqData{ID: "1", Created: time.Now()}, nil)
+	dbMock.On("LoadWorkData", mock.Anything, mock.Anything).Return(&persistence.WorkData{ID: "1", TryCount: 6,
+		Transcriber: utils.ToSQLStr("http://srv:8080")}, nil)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := handleASR(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
+	require.NotNil(t, err)
+	assert.Contains(t, err.Error(), "too many retries: 6")
 }
 
 func Test_handleASR_no_upload(t *testing.T) {
