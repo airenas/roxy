@@ -27,13 +27,17 @@ type trWrap struct {
 	key  string
 }
 
-// NewDB creates Request instance
+// NewProvider creates consul service registrator
 func NewProvider(cfg *api.Config) (*Provider, error) {
 	c, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &Provider{consul: c, lock: &sync.RWMutex{}, trans: make([]*trWrap, 0)}, nil
+	return newProvider(c), nil
+}
+
+func newProvider(c *api.Client) *Provider {
+	return &Provider{consul: c, lock: &sync.RWMutex{}, trans: make([]*trWrap, 0)}
 }
 
 func (c *Provider) Get(srv string, allowNew bool) (tapi.Transcriber, string, error) {
@@ -104,6 +108,10 @@ func (c *Provider) check(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("can't invoke consul: %v", err)
 	}
+	return c.updateSrv(srvs)
+}
+
+func (c *Provider) updateSrv(srvs []*api.ServiceEntry) error {
 	goapp.Log.Info().Msgf("got %d services from consul", len(srvs))
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -118,7 +126,7 @@ func (c *Provider) check(ctx context.Context) error {
 			delete(ms, s.srv)
 			continue
 		}
-		goapp.Log.Warn().Str("service", s.key).Msgf("dropped transcriber")
+		goapp.Log.Warn().Str("service", s.srv).Msgf("dropped transcriber")
 	}
 	if len(new) == len(c.trans) && len(ms) == 0 {
 		return nil
@@ -134,6 +142,7 @@ func (c *Provider) check(ctx context.Context) error {
 	}
 	return nil
 }
+
 
 func newTranscriber(v string, s *api.ServiceEntry) (*trWrap, error) {
 	tr, err := transcriber.NewClient(getUrl(s, "upload"), getUrl(s, "status"), getUrl(s, "result"), getUrl(s, "clean"))
