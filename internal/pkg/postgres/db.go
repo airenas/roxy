@@ -83,8 +83,9 @@ func (db *DB) UpdateWorkData(ctx context.Context, data *persistence.WorkData) er
 	external_id = $3, 
 	transcriber_url = $4,
 	try_count = $5,
-	version = $2 + 1 
-	WHERE id = $1 and version = $2`, data.ID, data.Version, data.ExternalID, data.Transcriber, data.TryCount)
+	version = $2 + 1,
+	updated = $6 
+	WHERE id = $1 and version = $2`, data.ID, data.Version, data.ExternalID, data.Transcriber, data.TryCount, time.Now())
 	if err != nil {
 		return fmt.Errorf("can't update work_data: %w", err)
 	}

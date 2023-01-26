@@ -13,20 +13,23 @@ type (
 		FileCount int
 		FileName  sql.NullString // file name for audio download
 		FileNames []string       // file names for upload
-		Created   time.Time
 		Email     sql.NullString
 		Params    map[string]string
 		RequestID string
+
+		Created time.Time
 	}
 
 	//WorkData table
 	WorkData struct {
 		ID          string
 		ExternalID  string
-		Created     time.Time
 		Transcriber sql.NullString
 		TryCount    int
-		Version     int
+
+		Version int
+		Created time.Time
+		Updated time.Time
 	}
 
 	//Status information table
@@ -38,9 +41,10 @@ type (
 		AudioReady       bool
 		Progress         sql.NullInt32
 		AvailableResults []string
-		Created          time.Time
-		Updated          time.Time
-		Version          int
 		RecognizedText   sql.NullString
+
+		Version int
+		Created time.Time
+		Updated time.Time
 	}
 )

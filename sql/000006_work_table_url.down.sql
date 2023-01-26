@@ -1,6 +1,9 @@
 BEGIN;
 
 ALTER TABLE
+    work_data DROP COLUMN updated;
+
+ALTER TABLE
     work_data DROP COLUMN version;
 
 ALTER TABLE
