@@ -4,7 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/airenas/async-api/pkg/messages"
+	amessages "github.com/airenas/async-api/pkg/messages"
+	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/airenas/roxy/internal/pkg/persistence"
 	"github.com/airenas/roxy/internal/pkg/transcriber/api"
 	"github.com/stretchr/testify/mock"
@@ -55,6 +56,10 @@ func (m *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) err
 	args := m.Called(ctx, data)
 	return args.Error(0)
 }
+func (m *DB) UpdateWorkData(ctx context.Context, data *persistence.WorkData) error {
+	args := m.Called(ctx, data)
+	return args.Error(0)
+}
 func (m *DB) DeleteWorkData(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
@@ -75,8 +80,8 @@ func (m *DB) UnLockEmailTable(ctx context.Context, id, lType string, val int) er
 // Sender is postgres queue mock
 type Sender struct{ mock.Mock }
 
-func (m *Sender) SendMessage(ctx context.Context, msg messages.Message, queue string) error {
-	args := m.Called(ctx, msg, queue)
+func (m *Sender) SendMessage(ctx context.Context, msg amessages.Message, opt *messages.Options) error {
+	args := m.Called(ctx, msg, opt)
 	return args.Error(0)
 }
 
@@ -111,6 +116,14 @@ func (m *Transcriber) GetResult(ctx context.Context, ID, name string) (*api.File
 func (m *Transcriber) Clean(ctx context.Context, ID string) error {
 	args := m.Called(ctx, ID)
 	return args.Error(0)
+}
+
+// TranscriberProvider is a provider mock
+type TranscriberProvider struct{ mock.Mock }
+
+func (m *TranscriberProvider) Get(key string, allowNew bool) (api.Transcriber, string, error) {
+	args := m.Called(key, allowNew)
+	return To[api.Transcriber](args.Get(0)), args.String(1), args.Error(2)
 }
 
 // To convert interface to object

@@ -27,6 +27,7 @@ var (
 	dbMock          *mocks.DB
 	senderMock      *mocks.Sender
 	transcriberMock *mocks.Transcriber
+	transcriberPrMock *mocks.TranscriberProvider
 	uRestorerMock   *mockUsageRestorer
 	srvData         *ServiceData
 )
@@ -36,11 +37,13 @@ func initTest(t *testing.T) {
 	dbMock = &mocks.DB{}
 	senderMock = &mocks.Sender{}
 	transcriberMock = &mocks.Transcriber{}
+	transcriberPrMock = &mocks.TranscriberProvider{}
 	uRestorerMock = &mockUsageRestorer{}
 	srvData = &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-		Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}
+		Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}
 	transcriberMock.On("Clean", mock.Anything, mock.Anything).Return(nil)
 	uRestorerMock.On("Do", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	transcriberPrMock.On("Get", mock.Anything, mock.Anything).Return(transcriberMock, "http://srv:8080", nil)
 }
 
 func Test_handleClean(t *testing.T) {
@@ -104,7 +107,7 @@ func Test_handleStatus(t *testing.T) {
 		Status: "Starting"}, srvData)
 	assert.Nil(t, err)
 	require.Equal(t, 1, len(senderMock.Calls))
-	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(messages.StatusChange) , senderMock.Calls[0].Arguments[2])
 }
 
 func Test_handleStatus_saveAudio(t *testing.T) {
@@ -148,9 +151,9 @@ func Test_handleStatus_completed(t *testing.T) {
 		Status: "COMPLETED"}, srvData)
 	assert.Nil(t, err)
 	require.Equal(t, 3, len(senderMock.Calls))
-	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
-	require.Equal(t, wrkQueuePrefix+wrkStatusClean, senderMock.Calls[1].Arguments[2])
-	require.Equal(t, messages.Inform, senderMock.Calls[2].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(messages.StatusChange), senderMock.Calls[0].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean), senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[2].Arguments[2])
 }
 
 func Test_handleStatus_completedOnError(t *testing.T) {
@@ -163,10 +166,10 @@ func Test_handleStatus_completedOnError(t *testing.T) {
 		Status: "Start", ErrorCode: "Service_err", Error: "error"}, srvData)
 	assert.Nil(t, err)
 	require.Equal(t, 4, len(senderMock.Calls))
-	require.Equal(t, messages.StatusChange, senderMock.Calls[0].Arguments[2])
-	require.Equal(t, wrkQueuePrefix+wrkStatusClean, senderMock.Calls[1].Arguments[2])
-	require.Equal(t, messages.Inform, senderMock.Calls[2].Arguments[2])
-	require.Equal(t, wrkQueuePrefix+wrkRestoreUsage, senderMock.Calls[3].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(messages.StatusChange), senderMock.Calls[0].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean), senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[2].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage), senderMock.Calls[3].Arguments[2])
 }
 
 func Test_handleStatus_skip(t *testing.T) {
@@ -204,21 +207,21 @@ func Test_validate(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "OK", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: false},
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: false},
 		{name: "Fail no data", args: args{data: &ServiceData{GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: true},
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
 		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: true},
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
 		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, MsgSender: senderMock,
-			Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: true},
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
 		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10,
-			Filer: filerMock, Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: true},
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
 		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Transcriber: transcriberMock, UsageRestorer: uRestorerMock}}, wantErr: true},
+		TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
 		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
 			Filer: filerMock}}, wantErr: true},
 		{name: "No usage restorer", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, Transcriber: transcriberMock}}, wantErr: true},
+			Filer: filerMock, TranscriberPr: transcriberPrMock}}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
