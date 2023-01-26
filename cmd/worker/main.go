@@ -73,13 +73,21 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
+	data.RetryDelay = cfg.GetDuration("worker.retryDelay")
+	if data.RetryDelay <= 0 {
+		data.RetryDelay = time.Minute
+	}
 
 	printBanner()
 
 	go utils.RunPerfEndpoint()
 
+	consulCheckInterval := cfg.GetDuration("worker.checkRegistry")
+	if consulCheckInterval <= 0 {
+		consulCheckInterval = time.Minute
+	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	doneProviderCh, err := transcribersProvider.StartCheckLoop(ctx, time.Minute)
+	doneProviderCh, err := transcribersProvider.StartCheckLoop(ctx, consulCheckInterval)
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't start consul checker")
 	}

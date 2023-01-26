@@ -61,6 +61,7 @@ type ServiceData struct {
 	TranscriberPr TranscriberProvider
 	UsageRestorer UsageRestorer
 	Testing       bool
+	RetryDelay    time.Duration
 }
 
 const (
@@ -82,6 +83,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	if data.Testing {
 		goapp.Log.Warn().Msg("SERVICE IN TEST MODE")
 	}
+	goapp.Log.Info().Dur("delay", data.RetryDelay).Msg("cfg: retry on no transcriber after")
 
 	wm := gue.WorkMap{
 		wrkUpload: handler.Create(data, handleASR, handler.DefaultOpts[messages.ASRMessage]().WithFailure(asrFailureHandler(data)).
@@ -151,7 +153,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 			return fmt.Errorf("no available transcriber in %s, added %s", maxWaitTime.String(), req.Created.Format(time.RFC3339))
 		}
 		// sleep 1 min
-		err := data.MsgSender.SendMessage(ctx, m, messages.DefaultOpts(messages.Upload).Delay(time.Minute))
+		err := data.MsgSender.SendMessage(ctx, m, messages.DefaultOpts(messages.Upload).Delay(data.RetryDelay))
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}

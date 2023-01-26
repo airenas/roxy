@@ -53,6 +53,7 @@ func Test_handleASR_delay(t *testing.T) {
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	transcriberPrMock.ExpectedCalls = nil
 	transcriberPrMock.On("Get", mock.Anything, mock.Anything).Return(nil, "", nil)
+	srvData.RetryDelay = time.Minute
 	err := handleASR(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
 	assert.Nil(t, err)
 	require.Equal(t, 2, len(senderMock.Calls))

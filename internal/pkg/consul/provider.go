@@ -165,7 +165,7 @@ func getUrl(s *api.ServiceEntry, key string) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("http://%s:%d/%s", s.Service.Service, s.Service.Port, v)
+	return fmt.Sprintf("http://%s:%d/%s", s.Service.Address, s.Service.Port, v)
 }
 
 func key(s *api.ServiceEntry) string {
