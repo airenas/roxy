@@ -135,7 +135,10 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	if err != nil {
 		return fmt.Errorf("can't load work data: %w", err)
 	}
-	oldSrv := utils.FromSQLStr(wd.Transcriber)
+	oldSrv := ""
+	if wd != nil {
+		oldSrv = utils.FromSQLStr(wd.Transcriber)
+	}
 	transcriber, trSrv, err := data.TranscriberPr.Get(oldSrv, true)
 	if err != nil {
 		return fmt.Errorf("can't get transcriber: %w", err)
@@ -220,7 +223,8 @@ func (e *errTranscriber) Unwrap() error {
 
 func statusFailureHandler(data *ServiceData) func(context.Context, *messages.StatusMessage, error) error {
 	return func(ctx context.Context, m *messages.StatusMessage, err error) error {
-		if errors.Is(err, &errTranscriber{}) {
+		tErr := &errTranscriber{}
+		if errors.As(err, &tErr) {
 			goapp.Log.Info().Str("ID", m.ID).Msg("retry transcription - transcriber result retrieve error")
 			err := data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
 				QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.Upload))

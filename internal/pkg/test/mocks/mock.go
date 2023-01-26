@@ -50,7 +50,7 @@ func (m *DB) LoadStatus(ctx context.Context, id string) (*persistence.Status, er
 }
 func (m *DB) LoadWorkData(ctx context.Context, id string) (*persistence.WorkData, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(*persistence.WorkData), args.Error(1)
+	return To[*persistence.WorkData](args.Get(0)), args.Error(1)
 }
 func (m *DB) InsertWorkData(ctx context.Context, data *persistence.WorkData) error {
 	args := m.Called(ctx, data)
@@ -95,7 +95,7 @@ func (m *Transcriber) Upload(ctx context.Context, audio *api.UploadData) (string
 
 func (m *Transcriber) HookToStatus(ctx context.Context, ID string) (<-chan api.StatusData, func(), error) {
 	args := m.Called(ctx, ID)
-	return args.Get(0).(<-chan api.StatusData), args.Get(1).(func()), args.Error(1)
+	return To[<-chan api.StatusData](args.Get(0)), To[func()](args.Get(1)), args.Error(2)
 }
 
 func (m *Transcriber) GetStatus(ctx context.Context, ID string) (*api.StatusData, error) {
@@ -105,7 +105,7 @@ func (m *Transcriber) GetStatus(ctx context.Context, ID string) (*api.StatusData
 
 func (m *Transcriber) GetAudio(ctx context.Context, ID string) (*api.FileData, error) {
 	args := m.Called(ctx, ID)
-	return args.Get(0).(*api.FileData), args.Error(1)
+	return To[*api.FileData](args.Get(0)), args.Error(1)
 }
 
 func (m *Transcriber) GetResult(ctx context.Context, ID, name string) (*api.FileData, error) {
