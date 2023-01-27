@@ -12,7 +12,7 @@ help:
 #####################################################################################
 ## start all containers
 start: 
-	docker compose up $(async) db migrate minio upload worker status result inform clean
+	docker compose up $(async) db migrate minio upload worker status result inform clean consul
 .PHONY: start
 ## start one specific container
 start/%: 
@@ -28,6 +28,9 @@ psql/postgres:
 test/integration: start 
 	docker compose up --build --exit-code-from integration-tests integration-tests
 .PHONY: test/integration
+test/just/integration: 
+	docker compose up --build integration-tests
+.PHONY: test/just/integration
 # invoke integration tests in verbose mode for ci
 test/integration/ci:  
 	( docker compose up & ); \

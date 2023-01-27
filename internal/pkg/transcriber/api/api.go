@@ -1,6 +1,9 @@
 package api
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 // UploadData keeps structure for upload method
 type UploadData struct {
@@ -26,4 +29,14 @@ type StatusData struct {
 type FileData struct {
 	Name    string
 	Content []byte
+}
+
+// Transcriber provides transcription
+type Transcriber interface {
+	Upload(ctx context.Context, audio *UploadData) (string, error)
+	HookToStatus(ctx context.Context, ID string) (<-chan StatusData, func(), error)
+	GetStatus(ctx context.Context, ID string) (*StatusData, error)
+	GetAudio(ctx context.Context, ID string) (*FileData, error)
+	GetResult(ctx context.Context, ID, name string) (*FileData, error)
+	Clean(ctx context.Context, ID string) error
 }

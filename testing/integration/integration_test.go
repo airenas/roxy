@@ -43,6 +43,7 @@ type config struct {
 	resultURL  string
 	cleanURL   string
 	dbURL      string
+	consulURL  string
 	httpclient *http.Client
 }
 
@@ -66,6 +67,7 @@ func TestMain(m *testing.M) {
 	cfg.resultURL = GetEnvOrFail("RESULT_URL")
 	cfg.cleanURL = GetEnvOrFail("CLEAN_URL")
 	cfg.dbURL = GetEnvOrFail("DB_URL")
+	cfg.consulURL = GetEnvOrFail("CONSUL_URL")
 	cfg.httpclient = &http.Client{Timeout: time.Second * 30}
 
 	tCtx, cf := context.WithTimeout(context.Background(), time.Second*20)
@@ -75,7 +77,9 @@ func TestMain(m *testing.M) {
 	WaitForOpenOrFail(tCtx, cfg.statusURL)
 	WaitForOpenOrFail(tCtx, cfg.resultURL)
 	WaitForOpenOrFail(tCtx, cfg.cleanURL)
+	WaitForOpenOrFail(tCtx, cfg.consulURL)
 	waitForDB(tCtx, cfg.dbURL)
+	registerToConsul(tCtx, cfg.consulURL+"/v1/catalog/register")
 
 	//start mocks service for private services - not in this docker compose
 	l, ts := startMockService(9876)
@@ -326,11 +330,10 @@ func TestInform_ExtFailure(t *testing.T) {
 	testEmailReceived(t, ur.ID, "Nepavyko")
 }
 
-
 func Test_RestoreReceived(t *testing.T) {
 	t.Parallel()
 	req := newUploadRequest(t, []string{"audio.wav"}, [][2]string{{"email", "olia@o.o"}, {"recognizer", "failStatus"},
-	{"numberOfSpeakers", "1"}})
+		{"numberOfSpeakers", "1"}})
 	restoreID := "restore123"
 	req.Header.Set("x-doorman-requestid", "asr:"+restoreID)
 	resp := test.Invoke(t, cfg.httpclient, req)
@@ -383,7 +386,7 @@ func testEmailReceived(t *testing.T, id, msgType string) {
 
 func testRestoreReceived(t *testing.T, id string) {
 	t.Helper()
-	dur := time.Second * 30
+	dur := time.Second * 60
 	tm := time.After(dur)
 	for {
 		select {
@@ -442,7 +445,7 @@ func newUploadRequest(t *testing.T, files []string, params [][2]string) *http.Re
 	req, err := http.NewRequest(http.MethodPost, cfg.uploadURL+"/upload", body)
 	require.Nil(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("x-doorman-requestid", "asr:" + uuid.NewString())
+	req.Header.Set("x-doorman-requestid", "asr:"+uuid.NewString())
 	return req
 }
 
@@ -521,7 +524,7 @@ func startMockService(port int) (net.Listener, *httptest.Server) {
 			log.Printf("got email: %s, %.50s", email.Subject, goapp.Sanitize(string(email.Text)))
 			emailData.mails = append(emailData.mails, email)
 		default:
-			if strings.HasPrefix(r.URL.String(), "/doorman/asr/restore/"){
+			if strings.HasPrefix(r.URL.String(), "/doorman/asr/restore/") {
 				restoresData.lock.Lock()
 				defer restoresData.lock.Unlock()
 				rID := r.URL.String()[len("/doorman/asr/restore/"):]

@@ -9,7 +9,6 @@ import (
 
 	amessages "github.com/airenas/async-api/pkg/messages"
 	"github.com/airenas/go-app/pkg/goapp"
-	"github.com/airenas/roxy/internal/pkg/messages"
 	"github.com/vgarvardt/gue/v5"
 )
 
@@ -18,15 +17,15 @@ type MsgSender interface {
 	SendMessage(context.Context, amessages.Message, string) error
 }
 
-type Opts struct {
-	failureSender MsgSender
-	retryCount    int32
-	backoff       gue.Backoff
-	timeout       time.Duration
+type Opts[TM any] struct {
+	retryCount     int32
+	backoff        gue.Backoff
+	timeout        time.Duration
+	failureHandler func(context.Context, *TM, error) error
 }
 
 // CreateHandler helper func to wrapp gue worker main func
-func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, opts *Opts) gue.WorkFunc {
+func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, opts *Opts[TM]) gue.WorkFunc {
 	if opts == nil {
 		goapp.Log.Panic().Msg("no opts provided")
 	}
@@ -51,15 +50,12 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 
 		// process error
 		if j.ErrorCount > opts.retryCount {
-			if opts.failureSender != nil {
-				if _err := sendStatusChangeFailure(ctx, opts.failureSender, &m, err.Error()); _err != nil {
-					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send status failure msg")
-				}
-				if _err := sendFailure(ctx, opts.failureSender, &m); _err != nil {
-					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail send failure msg")
+			if opts.failureHandler != nil {
+				if _err := opts.failureHandler(ctx, &m, err); _err != nil {
+					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail execute failure handler")
 				}
 			} else {
-				goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Msg("skip failure msg")
+				goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Msg("skip failure handler")
 			}
 			return nil
 		}
@@ -69,29 +65,8 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 	}
 }
 
-func sendFailure(ctx context.Context, sender MsgSender, m interface{}) error {
-	qm, ok := m.(amessages.Message)
-	if !ok {
-		return fmt.Errorf("no Message (%T)", m)
-	}
-	goapp.Log.Info().Str("ID", qm.GetID()).Msg("sending failure msg")
-	return sender.SendMessage(ctx, &amessages.InformMessage{
-		QueueMessage: amessages.QueueMessage{ID: qm.GetID()},
-		Type:         amessages.InformTypeFailed, At: time.Now()}, messages.Inform)
-}
-
-func sendStatusChangeFailure(ctx context.Context, sender MsgSender, m interface{}, errStr string) error {
-	qm, ok := m.(amessages.Message)
-	if !ok {
-		return fmt.Errorf("no Message (%T)", m)
-	}
-	goapp.Log.Info().Str("ID", qm.GetID()).Msg("sending failure status change msg")
-	return sender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: qm.GetID(), Error: errStr}}, messages.Fail)
-}
-
-func DefaultOpts() *Opts {
-	return &Opts{retryCount: 3, backoff: DefaultBackoff(), timeout: time.Minute * 15}
+func DefaultOpts[TM any]() *Opts[TM] {
+	return &Opts[TM]{retryCount: 3, backoff: DefaultBackoff(), timeout: time.Minute * 15}
 }
 
 func DefaultBackoff() gue.Backoff {
@@ -113,17 +88,17 @@ func DefaultBackoffOrTest(test bool) gue.Backoff {
 	return DefaultBackoff()
 }
 
-func (o *Opts) WithFailure(failureSender MsgSender) *Opts {
-	o.failureSender = failureSender
+func (o *Opts[TM]) WithFailure(failureHandler func(context.Context, *TM, error) error) *Opts[TM] {
+	o.failureHandler = failureHandler
 	return o
 }
 
-func (o *Opts) WithTimeout(timeout time.Duration) *Opts {
+func (o *Opts[TM]) WithTimeout(timeout time.Duration) *Opts[TM] {
 	o.timeout = timeout
 	return o
 }
 
-func (o *Opts) WithBackoff(b gue.Backoff) *Opts {
+func (o *Opts[TM]) WithBackoff(b gue.Backoff) *Opts[TM] {
 	o.backoff = b
 	return o
 }

@@ -10,10 +10,11 @@ import (
 	"github.com/airenas/async-api/pkg/miniofs"
 	"github.com/airenas/async-api/pkg/usage"
 	"github.com/airenas/go-app/pkg/goapp"
+	"github.com/airenas/roxy/internal/pkg/consul"
 	"github.com/airenas/roxy/internal/pkg/postgres"
-	"github.com/airenas/roxy/internal/pkg/transcriber"
 	"github.com/airenas/roxy/internal/pkg/utils"
 	"github.com/airenas/roxy/internal/pkg/worker"
+	"github.com/hashicorp/consul/api"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/gommon/color"
 	"github.com/vgarvardt/gue/v5"
@@ -62,23 +63,27 @@ func main() {
 
 	data.DB = db
 
-	data.Transcriber, err = transcriber.NewClient(cfg.GetString("transcriber.uploadUrl"),
-		cfg.GetString("transcriber.statusUrl"), cfg.GetString("transcriber.resultUrl"), cfg.GetString("transcriber.cleanUrl"))
+	transcribersProvider, err := consul.NewProvider(api.DefaultConfig(), defaultStr(cfg.GetString("worker.registryName"), "asr"))
 	if err != nil {
-		goapp.Log.Fatal().Err(err).Msg("can't init transcriber")
+		goapp.Log.Fatal().Err(err).Msg("can't init transcriber's provider")
 	}
+	data.TranscriberPr = transcribersProvider
 
 	data.UsageRestorer, err = usage.NewRestorer(cfg.GetString("doorman.URL"))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
+	data.RetryDelay = defaultDur(cfg.GetDuration("worker.retryDelay"), time.Minute)
 
 	printBanner()
 
 	go utils.RunPerfEndpoint()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	// data.StopCtx = ctx
+	doneProviderCh, err := transcribersProvider.StartRegistryLoop(ctx, defaultDur(cfg.GetDuration("worker.checkRegistry"), time.Minute))
+	if err != nil {
+		goapp.Log.Fatal().Err(err).Msg("can't start consul checker")
+	}
 	doneCh, err := worker.StartWorkerService(ctx, data)
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't start worker service")
@@ -91,6 +96,8 @@ func main() {
 		goapp.Log.Info().Msg("Got exit signal")
 	case <-doneCh:
 		goapp.Log.Info().Msg("Service exit")
+	case <-doneProviderCh:
+		goapp.Log.Info().Msg("Consul checker exit")
 	}
 	cancelFunc()
 	select {
@@ -99,6 +106,20 @@ func main() {
 	case <-time.After(time.Second * 15):
 		goapp.Log.Warn().Msg("Timeout gracefull shutdown")
 	}
+}
+
+func defaultDur(dur, d time.Duration) time.Duration {
+	if dur > 0 {
+		return dur
+	}
+	return d
+}
+
+func defaultStr(s1, d string) string {
+	if s1 != "" {
+		return s1
+	}
+	return d
 }
 
 var (
