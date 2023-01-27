@@ -148,7 +148,7 @@ func TestProvider_updateSrv_drops(t *testing.T) {
 			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(p.trans))
-	c1, c2 := p.trans[0], p.trans[2]
+	c1, c2 := p.trans[0].srv, p.trans[2].srv
 	err = p.updateSrv([]*api.ServiceEntry{
 		{Service: &api.AgentService{Service: "olia", Port: 82, Address: "srv",
 			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
@@ -157,6 +157,6 @@ func TestProvider_updateSrv_drops(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(p.trans))
-	assert.Equal(t, c1, p.trans[0])
-	assert.Equal(t, c2, p.trans[1])
+	assert.Equal(t, c1, p.trans[0].srv)
+	assert.Equal(t, c2, p.trans[1].srv)
 }
