@@ -1,7 +1,7 @@
 -include ../../version 
 #####################################################################################
 service=airenas/roxy-inform
-version?=$(result_version)
+version?=$(inform_version)
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 
