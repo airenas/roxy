@@ -22,7 +22,8 @@ const (
 )
 
 type Provider struct {
-	consul *api.Client
+	consul  *api.Client
+	srvName string
 
 	lock     *sync.RWMutex
 	trans    []*trWrap
@@ -36,16 +37,20 @@ type trWrap struct {
 }
 
 // NewProvider creates consul service registrator
-func NewProvider(cfg *api.Config) (*Provider, error) {
+func NewProvider(cfg *api.Config, srvNameInConsul string) (*Provider, error) {
 	c, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return newProvider(c), nil
+	if srvNameInConsul == "" {
+		return nil, fmt.Errorf("no srv name")
+	}
+	return newProvider(c, srvNameInConsul), nil
 }
 
-func newProvider(c *api.Client) *Provider {
-	return &Provider{consul: c, lock: &sync.RWMutex{}, trans: make([]*trWrap, 0)}
+func newProvider(c *api.Client, srvNameInConsul string) *Provider {
+	goapp.Log.Info().Str("service", srvNameInConsul).Msg("cfg: srv name in consul")
+	return &Provider{consul: c, srvName: srvNameInConsul, lock: &sync.RWMutex{}, trans: make([]*trWrap, 0)}
 }
 
 func (c *Provider) Get(srv string, allowNew bool) (tapi.Transcriber, string, error) {
@@ -77,7 +82,7 @@ func (c *Provider) Get(srv string, allowNew bool) (tapi.Transcriber, string, err
 	return nil, "", nil
 }
 
-func (c *Provider) StartCheckLoop(ctx context.Context, checkInterval time.Duration) (<-chan struct{}, error) {
+func (c *Provider) StartRegistryLoop(ctx context.Context, checkInterval time.Duration) (<-chan struct{}, error) {
 	goapp.Log.Info().Msgf("Starting consul service check every %v", checkInterval)
 	res := make(chan struct{}, 2)
 	go func() {
@@ -110,7 +115,7 @@ func (c *Provider) serviceLoop(ctx context.Context, interval time.Duration) {
 func (c *Provider) check(ctx context.Context) error {
 	ctxInt, cf := context.WithTimeout(ctx, time.Second*5)
 	defer cf()
-	srvs, _, err := c.consul.Health().Service("asr", "", true, (&api.QueryOptions{}).WithContext(ctxInt))
+	srvs, _, err := c.consul.Health().Service(c.srvName, "", true, (&api.QueryOptions{}).WithContext(ctxInt))
 	if err != nil {
 		return fmt.Errorf("can't invoke consul: %v", err)
 	}

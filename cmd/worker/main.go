@@ -63,7 +63,7 @@ func main() {
 
 	data.DB = db
 
-	transcribersProvider, err := consul.NewProvider(api.DefaultConfig())
+	transcribersProvider, err := consul.NewProvider(api.DefaultConfig(), defaultStr(cfg.GetString("worker.registryName"), "asr"))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init transcriber's provider")
 	}
@@ -73,21 +73,14 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
-	data.RetryDelay = cfg.GetDuration("worker.retryDelay")
-	if data.RetryDelay <= 0 {
-		data.RetryDelay = time.Minute
-	}
+	data.RetryDelay = defaultDur(cfg.GetDuration("worker.retryDelay"), time.Minute)
 
 	printBanner()
 
 	go utils.RunPerfEndpoint()
 
-	consulCheckInterval := cfg.GetDuration("worker.checkRegistry")
-	if consulCheckInterval <= 0 {
-		consulCheckInterval = time.Minute
-	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	doneProviderCh, err := transcribersProvider.StartCheckLoop(ctx, consulCheckInterval)
+	doneProviderCh, err := transcribersProvider.StartRegistryLoop(ctx, defaultDur(cfg.GetDuration("worker.checkRegistry"), time.Minute))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't start consul checker")
 	}
@@ -113,6 +106,20 @@ func main() {
 	case <-time.After(time.Second * 15):
 		goapp.Log.Warn().Msg("Timeout gracefull shutdown")
 	}
+}
+
+func defaultDur(dur, d time.Duration) time.Duration {
+	if dur > 0 {
+		return dur
+	}
+	return d
+}
+
+func defaultStr(s1, d string) string {
+	if s1 != "" {
+		return s1
+	}
+	return d
 }
 
 var (

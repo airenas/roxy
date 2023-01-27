@@ -11,7 +11,7 @@ import (
 )
 
 func Test_Get_empty(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	tr, name, err := p.Get("olia", true)
 	assert.Nil(t, tr)
 	assert.Equal(t, "", name)
@@ -23,7 +23,7 @@ func Test_Get_empty(t *testing.T) {
 }
 
 func Test_Get_existing(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia"})
 	rtr, name, err := p.Get("olia", true)
@@ -45,7 +45,7 @@ func Test_Get_existing(t *testing.T) {
 }
 
 func Test_Get_by_name(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	tr1 := &mocks.Transcriber{}
 	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia"})
@@ -64,7 +64,7 @@ func Test_Get_by_name(t *testing.T) {
 }
 
 func Test_Get_round_robin(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	tr1 := &mocks.Transcriber{}
 	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia"})
@@ -83,13 +83,13 @@ func testAssertEqPtr(t *testing.T, tr, exp tapi.Transcriber) {
 }
 
 func TestProvider_updateSrv_no_meta(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv", Meta: map[string]string{}}}})
 	assert.NotNil(t, err)
 }
 
 func TestProvider_updateSrv_adds(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
 		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
@@ -97,7 +97,7 @@ func TestProvider_updateSrv_adds(t *testing.T) {
 }
 
 func TestProvider_updateSrv_addsSame(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
 		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
@@ -111,7 +111,7 @@ func TestProvider_updateSrv_addsSame(t *testing.T) {
 }
 
 func TestProvider_updateSrv_updates(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
 		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
@@ -125,7 +125,7 @@ func TestProvider_updateSrv_updates(t *testing.T) {
 }
 
 func TestProvider_updateSrv_addsTwo(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
 		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
@@ -139,7 +139,7 @@ func TestProvider_updateSrv_addsTwo(t *testing.T) {
 }
 
 func TestProvider_updateSrv_drops(t *testing.T) {
-	p := newProvider(nil)
+	p := newProvider(nil, "")
 	err := p.updateSrv([]*api.ServiceEntry{{Service: &api.AgentService{Service: "olia", Port: 80, Address: "srv",
 		Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
 		{Service: &api.AgentService{Service: "olia", Port: 81, Address: "srv",
