@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,10 +16,11 @@ import (
 )
 
 const (
-	uploadKey = "uploadURL"
-	statusKey = "statusURL"
-	resultKey = "resultURL"
-	cleanKey  = "cleanURL"
+	uploadKey    = "uploadURL"
+	statusKey    = "statusURL"
+	resultKey    = "resultURL"
+	cleanKey     = "cleanURL"
+	isHTTPSSLKey = "HTTPSSL"
 )
 
 type Provider struct {
@@ -170,7 +172,14 @@ func getUrl(s *api.ServiceEntry, key string) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("http://%s:%d/%s", s.Service.Address, s.Service.Port, v)
+	ssl := ""
+	if isSSL, ok := s.Service.Meta[isHTTPSSLKey]; ok {
+		if boolValue, err := strconv.ParseBool(isSSL); err == nil && boolValue {
+			ssl = "s"
+		}
+	}
+	//todo add https support - see consul HTTP_SSL key
+	return fmt.Sprintf("http%s://%s:%d/%s", ssl, s.Service.Address, s.Service.Port, v)
 }
 
 func key(s *api.ServiceEntry) string {
@@ -179,7 +188,7 @@ func key(s *api.ServiceEntry) string {
 
 func fullKey(s *api.ServiceEntry) string {
 	res := strings.Builder{}
-	for _, key := range [...]string{uploadKey, statusKey, resultKey, cleanKey} {
+	for _, key := range [...]string{uploadKey, statusKey, resultKey, cleanKey, isHTTPSSLKey} {
 		v, ok := s.Service.Meta[key]
 		if ok {
 			res.WriteString(key + ":" + v + ",")

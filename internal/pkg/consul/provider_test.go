@@ -160,3 +160,27 @@ func TestProvider_updateSrv_drops(t *testing.T) {
 	assert.Equal(t, c1, p.trans[0].srv)
 	assert.Equal(t, c2, p.trans[1].srv)
 }
+
+func Test_getUrl(t *testing.T) {
+	type args struct {
+		s   *api.ServiceEntry
+		key string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{name: "http", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr"}}}, key: "uploadURL"},
+			want: "http://srv:81/upload/tr"},
+		{name: "https", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "HTTPSSL":"1"}}}, key: "uploadURL"},
+			want: "https://srv:81/upload/tr"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getUrl(tt.args.s, tt.args.key); got != tt.want {
+				t.Errorf("getUrl() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
