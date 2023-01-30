@@ -317,7 +317,7 @@ func Test_handleStatusFailure_retry(t *testing.T) {
 	initTest(t)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	retry, delay, err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
-		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, &errTranscriber{err: fmt.Errorf("olia")}, &gue.Job{ErrorCount: 3})
+		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, &errTranscriber{err: fmt.Errorf("olia")}, &gue.Job{ErrorCount: 2})
 	assert.Nil(t, err)
 	assert.True(t, retry)
 	assert.Equal(t, time.Second, delay)
