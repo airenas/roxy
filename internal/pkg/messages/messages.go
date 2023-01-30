@@ -12,8 +12,6 @@ const (
 	Upload = st + "Work:wrk-upload"
 	// Work queue name
 	Work = st + "Work"
-	// Fail queue name
-	Fail = st + "Work:wrk-fail"
 	// Inform  queue name
 	Inform = st + "Inform"
 	// StatusChange queue name

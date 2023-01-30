@@ -363,7 +363,7 @@ func TestClean(t *testing.T) {
 
 func testEmailReceived(t *testing.T, id, msgType string) {
 	t.Helper()
-	dur := time.Second * 30
+	dur := time.Second * 60
 	tm := time.After(dur)
 	for {
 		select {

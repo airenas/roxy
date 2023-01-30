@@ -105,7 +105,7 @@ func Test_handleASR_no_upload(t *testing.T) {
 	err := handleASR(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(senderMock.Calls))
-	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkStatusQueue), senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkStatusQueue), senderMock.Calls[1].Arguments[2])
 }
 
 func testMapCh(in chan tapi.StatusData) <-chan tapi.StatusData {
@@ -229,7 +229,7 @@ func Test_handleStatus_completed(t *testing.T) {
 	assert.Nil(t, err)
 	require.Equal(t, 3, len(senderMock.Calls))
 	require.Equal(t, messages.DefaultOpts(messages.StatusChange), senderMock.Calls[0].Arguments[2])
-	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean), senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkStatusClean), senderMock.Calls[1].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[2].Arguments[2])
 }
 
@@ -244,9 +244,9 @@ func Test_handleStatus_completedOnError(t *testing.T) {
 	assert.Nil(t, err)
 	require.Equal(t, 4, len(senderMock.Calls))
 	require.Equal(t, messages.DefaultOpts(messages.StatusChange), senderMock.Calls[0].Arguments[2])
-	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean), senderMock.Calls[1].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkStatusClean), senderMock.Calls[1].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[2].Arguments[2])
-	require.Equal(t, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage), senderMock.Calls[3].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkRestoreUsage), senderMock.Calls[3].Arguments[2])
 }
 
 func Test_handleStatus_skip(t *testing.T) {
@@ -318,7 +318,7 @@ func Test_handleStatusFailure_other_err(t *testing.T) {
 		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, fmt.Errorf("olia"))
 	assert.Nil(t, err)
 	require.Equal(t, 2, len(senderMock.Calls))
-	require.Equal(t, messages.DefaultOpts(messages.Fail), senderMock.Calls[0].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkFail), senderMock.Calls[0].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[1].Arguments[2])
 }
 
@@ -328,7 +328,7 @@ func Test_handleAsrFailure(t *testing.T) {
 	err := asrFailureHandler(srvData)(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, fmt.Errorf("olia"))
 	assert.Nil(t, err)
 	require.Equal(t, 2, len(senderMock.Calls))
-	require.Equal(t, messages.DefaultOpts(messages.Fail), senderMock.Calls[0].Arguments[2])
+	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkFail), senderMock.Calls[0].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[1].Arguments[2])
 }
 

@@ -66,12 +66,13 @@ type ServiceData struct {
 }
 
 const (
-	wrkQueuePrefix  = messages.Work + ":"
-	wrkStatusQueue  = "wrk-status"
-	wrkStatusClean  = "wrk-clean"
-	wrkStatusFail   = "wrk-fail"
-	wrkUpload       = "wrk-upload"
-	wrkRestoreUsage = "wrk-restore-usage"
+	wrkOtherQueuePrefix = "ROXY/Work1"
+	wrkStatusQueue      = "wrk-status"
+	wrkStatusClean      = "wrk-clean"
+	wrkStatusFail       = "wrk-fail"
+	wrkUpload           = "wrk-upload"
+	wrkRestoreUsage     = "wrk-restore-usage"
+	wrkFail             = "wrk-fail"
 )
 
 // StartWorkerService starts the event queue listener service to listen for events
@@ -92,8 +93,8 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	}
 
 	ctxInt, cf := context.WithCancel(ctx)
-	defer func () { cf() } ()
-	ecASR, err := startPool(ctxInt, data, data.WorkerCount, wm, "asr-worker")
+	defer func() { cf() }()
+	ecASR, err := startPool(ctxInt, data, data.WorkerCount, wm, messages.Work, "asr-worker")
 	if err != nil {
 		return nil, fmt.Errorf("could not start pool: %w", err)
 	}
@@ -104,7 +105,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 		wrkStatusFail:   handler.Create(data, handleFailure, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 		wrkRestoreUsage: handler.Create(data, handleRestoreUsage, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 	}
-	ecOther, err := startPool(ctxInt, data, data.WorkerOtherCount, wmOther, "asr-worker-other")
+	ecOther, err := startPool(ctxInt, data, data.WorkerOtherCount, wmOther, wrkOtherQueuePrefix, "asr-worker-other")
 	if err != nil {
 		return nil, fmt.Errorf("could not start pool: %w", err)
 	}
@@ -128,10 +129,10 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	return res, nil
 }
 
-func startPool(ctx context.Context, data *ServiceData, count int, wm gue.WorkMap, name string) (<-chan struct{}, error) {
+func startPool(ctx context.Context, data *ServiceData, count int, wm gue.WorkMap, queue, name string) (<-chan struct{}, error) {
 	pool, err := gue.NewWorkerPool(
 		data.GueClient, wm, count,
-		gue.WithPoolQueue(messages.Work),
+		gue.WithPoolQueue(queue),
 		gue.WithPoolLogger(utils.NewGueLoggerAdapter()),
 		gue.WithPoolPollInterval(500*time.Millisecond),
 		gue.WithPoolPollStrategy(gue.RunAtPollStrategy),
@@ -142,7 +143,7 @@ func startPool(ctx context.Context, data *ServiceData, count int, wm gue.WorkMap
 	}
 	res := make(chan struct{}, 1)
 	go func() {
-		goapp.Log.Info().Int("workers", count).Str("name", name).Msg("Starting pool")
+		goapp.Log.Info().Int("workers", count).Str("name", name).Str("queue", queue).Msg("starting pool")
 		if err := pool.Run(ctx); err != nil {
 			goapp.Log.Error().Err(err).Msg("pool error")
 		}
@@ -299,7 +300,7 @@ func sendFailure(ctx context.Context, sender MsgSender, ID string) error {
 func sendStatusChangeFailure(ctx context.Context, sender MsgSender, ID string, errStr string) error {
 	goapp.Log.Info().Str("ID", ID).Msg("sending failure status change msg")
 	return sender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: ID, Error: errStr}}, messages.DefaultOpts(messages.Fail))
+		QueueMessage: amessages.QueueMessage{ID: ID, Error: errStr}}, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkFail))
 }
 
 func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceData) error {
@@ -366,7 +367,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		err = data.MsgSender.SendMessage(ctx, &messages.CleanMessage{
 			QueueMessage: amessages.QueueMessage{ID: m.ID},
 			ExternalID:   m.ExternalID, Transcriber: m.Transcriber},
-			messages.DefaultOpts(wrkQueuePrefix+wrkStatusClean))
+			messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkStatusClean))
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
 		}
@@ -378,7 +379,7 @@ func handleStatus(ctx context.Context, m *messages.StatusMessage, data *ServiceD
 		}
 		if m.Error != "" {
 			err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage))
+				QueueMessage: *amessages.NewQueueMessageFromM(&m.QueueMessage)}, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkRestoreUsage))
 			if err != nil {
 				return fmt.Errorf("can't send msg: %w", err)
 			}
@@ -428,7 +429,7 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 		return fmt.Errorf("can't send msg: %w", err)
 	}
 	err = data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(wrkQueuePrefix+wrkRestoreUsage))
+		QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkRestoreUsage))
 	if err != nil {
 		return fmt.Errorf("can't send msg: %w", err)
 	}
@@ -539,7 +540,7 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, wd *persist
 		RecognizedText:   statusData.RecognizedText,
 		ExternalID:       wd.ExternalID,
 		Transcriber:      utils.FromSQLStr(wd.Transcriber),
-	}, messages.DefaultOpts(wrkQueuePrefix+wrkStatusQueue))
+	}, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkStatusQueue))
 	if err != nil {
 		return false, fmt.Errorf("can't send msg: %w", err)
 	}
