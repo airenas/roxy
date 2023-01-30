@@ -92,7 +92,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	}
 
 	ctxInt, cf := context.WithCancel(ctx)
-	defer cf()
+	defer func () { cf() } ()
 	ecASR, err := startPool(ctxInt, data, data.WorkerCount, wm, "asr-worker")
 	if err != nil {
 		return nil, fmt.Errorf("could not start pool: %w", err)
@@ -109,6 +109,8 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 		return nil, fmt.Errorf("could not start pool: %w", err)
 	}
 	res := make(chan struct{}, 1)
+	cfInt := cf
+	cf = func() {}
 	go func() {
 		// wait for any pool to finish
 		select {
@@ -116,7 +118,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 		case <-ecOther:
 		}
 		// drop context
-		cf()
+		cfInt()
 		// wait for both pool to finish
 		<-ecASR
 		<-ecOther
