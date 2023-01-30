@@ -53,15 +53,16 @@ type TranscriberProvider interface {
 
 // ServiceData keeps data required for service work
 type ServiceData struct {
-	GueClient     *gue.Client
-	WorkerCount   int
-	MsgSender     MsgSender
-	DB            DB
-	Filer         Filer
-	TranscriberPr TranscriberProvider
-	UsageRestorer UsageRestorer
-	Testing       bool
-	RetryDelay    time.Duration
+	GueClient        *gue.Client
+	WorkerCount      int // ASR worker
+	WorkerOtherCount int // for handling statuses, etc
+	MsgSender        MsgSender
+	DB               DB
+	Filer            Filer
+	TranscriberPr    TranscriberProvider
+	UsageRestorer    UsageRestorer
+	Testing          bool
+	RetryDelay       time.Duration
 }
 
 const (
@@ -79,7 +80,7 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	if err := validate(data); err != nil {
 		return nil, err
 	}
-	goapp.Log.Info().Int("workers", data.WorkerCount).Msg("Starting listen for messages")
+	goapp.Log.Info().Int("workers", data.WorkerCount).Int("workersOther", data.WorkerOtherCount).Msg("Starting listen for messages")
 	if data.Testing {
 		goapp.Log.Warn().Msg("SERVICE IN TEST MODE")
 	}
@@ -88,32 +89,63 @@ func StartWorkerService(ctx context.Context, data *ServiceData) (chan struct{}, 
 	wm := gue.WorkMap{
 		wrkUpload: handler.Create(data, handleASR, handler.DefaultOpts[messages.ASRMessage]().WithFailure(asrFailureHandler(data)).
 			WithTimeout(time.Minute*120).WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
+	}
+
+	ctxInt, cf := context.WithCancel(ctx)
+	defer cf()
+	ecASR, err := startPool(ctxInt, data, data.WorkerCount, wm, "asr-worker")
+	if err != nil {
+		return nil, fmt.Errorf("could not start pool: %w", err)
+	}
+	wmOther := gue.WorkMap{
 		wrkStatusQueue: handler.Create(data, handleStatus, handler.DefaultOpts[messages.StatusMessage]().WithFailure(statusFailureHandler(data)).
 			WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 		wrkStatusClean:  handler.Create(data, handleClean, handler.DefaultOpts[messages.CleanMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 		wrkStatusFail:   handler.Create(data, handleFailure, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 		wrkRestoreUsage: handler.Create(data, handleRestoreUsage, handler.DefaultOpts[messages.ASRMessage]().WithBackoff(handler.DefaultBackoffOrTest(data.Testing))),
 	}
+	ecOther, err := startPool(ctxInt, data, data.WorkerOtherCount, wmOther, "asr-worker-other")
+	if err != nil {
+		return nil, fmt.Errorf("could not start pool: %w", err)
+	}
+	res := make(chan struct{}, 1)
+	go func() {
+		// wait for any pool to finish
+		select {
+		case <-ecASR:
+		case <-ecOther:
+		}
+		// drop context
+		cf()
+		// wait for both pool to finish
+		<-ecASR
+		<-ecOther
+		goapp.Log.Info().Msg("pool workers finished")
+		close(res)
+	}()
+	return res, nil
+}
 
+func startPool(ctx context.Context, data *ServiceData, count int, wm gue.WorkMap, name string) (<-chan struct{}, error) {
 	pool, err := gue.NewWorkerPool(
-		data.GueClient, wm, data.WorkerCount,
+		data.GueClient, wm, count,
 		gue.WithPoolQueue(messages.Work),
 		gue.WithPoolLogger(utils.NewGueLoggerAdapter()),
 		gue.WithPoolPollInterval(500*time.Millisecond),
 		gue.WithPoolPollStrategy(gue.RunAtPollStrategy),
-		gue.WithPoolID("asr-worker"),
+		gue.WithPoolID(name),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not build gue workers pool: %w", err)
 	}
 	res := make(chan struct{}, 1)
 	go func() {
-		goapp.Log.Info().Msg("Starting workers")
+		goapp.Log.Info().Int("workers", count).Str("name", name).Msg("Starting pool")
 		if err := pool.Run(ctx); err != nil {
 			goapp.Log.Error().Err(err).Msg("pool error")
 		}
-		goapp.Log.Info().Msg("Pool workers finished")
-		res <- struct{}{}
+		goapp.Log.Info().Str("name", name).Msg("exit workers")
+		close(res)
 	}()
 	return res, nil
 }
@@ -555,6 +587,9 @@ func validate(data *ServiceData) error {
 	}
 	if data.WorkerCount < 1 {
 		return fmt.Errorf("no worker count provided")
+	}
+	if data.WorkerOtherCount < 1 {
+		return fmt.Errorf("no worker other count provided")
 	}
 	if data.MsgSender == nil {
 		return fmt.Errorf("no msg sender")

@@ -334,34 +334,33 @@ func Test_handleAsrFailure(t *testing.T) {
 
 func Test_validate(t *testing.T) {
 	initTest(t)
+	def := func() *ServiceData {
+		return &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
+			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock, WorkerOtherCount: 1}
+	}
 	type args struct {
-		data *ServiceData
+		cf func(*ServiceData)
 	}
 	tests := []struct {
 		name    string
 		args    args
 		wantErr bool
 	}{
-		{name: "OK", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: false},
-		{name: "Fail no data", args: args{data: &ServiceData{GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
-		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
-		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, MsgSender: senderMock,
-			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
-		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10,
-			Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
-		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}}, wantErr: true},
-		{name: "Fail no data", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock}}, wantErr: true},
-		{name: "No usage restorer", args: args{data: &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-			Filer: filerMock, TranscriberPr: transcriberPrMock}}, wantErr: true},
+		{name: "OK", args: args{cf: func(sd *ServiceData) {}}, wantErr: false},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.DB = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.Filer = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.GueClient = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.MsgSender = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.TranscriberPr = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.UsageRestorer = nil }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.WorkerCount = 0 }}, wantErr: true},
+		{name: "Fail no data", args: args{cf: func(sd *ServiceData) { sd.WorkerOtherCount = 0 }}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validate(tt.args.data); (err != nil) != tt.wantErr {
+			v := def()
+			tt.args.cf(v)
+			if err := validate(v); (err != nil) != tt.wantErr {
 				t.Errorf("StartServer() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

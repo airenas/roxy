@@ -45,7 +45,8 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue")
 	}
-	data.WorkerCount = cfg.GetInt("worker.count")
+	data.WorkerCount = defaultV(cfg.GetInt("worker.count"), 5)
+	data.WorkerOtherCount = defaultV(cfg.GetInt("worker.otherCount"), 2)
 	data.Testing = cfg.GetBool("worker.testing")
 	data.MsgSender, err = postgres.NewSender(dbPool)
 	if err != nil {
@@ -63,7 +64,7 @@ func main() {
 
 	data.DB = db
 
-	transcribersProvider, err := consul.NewProvider(api.DefaultConfig(), defaultStr(cfg.GetString("worker.registryName"), "asr"))
+	transcribersProvider, err := consul.NewProvider(api.DefaultConfig(), defaultV(cfg.GetString("worker.registryName"), "asr"))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init transcriber's provider")
 	}
@@ -73,14 +74,14 @@ func main() {
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
-	data.RetryDelay = defaultDur(cfg.GetDuration("worker.retryDelay"), time.Minute)
+	data.RetryDelay = defaultV(cfg.GetDuration("worker.retryDelay"), time.Minute)
 
 	printBanner()
 
 	go utils.RunPerfEndpoint()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	doneProviderCh, err := transcribersProvider.StartRegistryLoop(ctx, defaultDur(cfg.GetDuration("worker.checkRegistry"), time.Minute))
+	doneProviderCh, err := transcribersProvider.StartRegistryLoop(ctx, defaultV(cfg.GetDuration("worker.checkRegistry"), time.Minute))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't start consul checker")
 	}
@@ -108,16 +109,10 @@ func main() {
 	}
 }
 
-func defaultDur(dur, d time.Duration) time.Duration {
-	if dur > 0 {
-		return dur
-	}
-	return d
-}
-
-func defaultStr(s1, d string) string {
-	if s1 != "" {
-		return s1
+func defaultV[T comparable](s T, d T) T {
+	var def T
+	if s != def {
+		return s
 	}
 	return d
 }
