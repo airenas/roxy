@@ -496,7 +496,7 @@ func waitStatus(ctx context.Context, wd *persistence.WorkData, data *ServiceData
 			{
 				if !ok {
 					goapp.Log.Info().Msg("closed status channel")
-					return nil
+					return fmt.Errorf("close channel without finish")
 				}
 				finish, err := processStatus(ctx, &d, wd, data)
 				if err != nil {
