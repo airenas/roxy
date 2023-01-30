@@ -285,7 +285,7 @@ func statusFailureHandler(data *ServiceData) func(context.Context, *messages.Sta
 			goapp.Log.Info().Str("ID", m.ID).Msg("got transcriber error")
 			delay = data.RetryDelay
 		}
-		if j.ErrorCount < 5 {
+		if j.ErrorCount < 3 {
 			return true, delay, nil
 		}
 		if errors.As(err, &tErr) {

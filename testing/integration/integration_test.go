@@ -168,7 +168,7 @@ func TestStatus_Text(t *testing.T) {
 }
 
 func testWaitStatus(t *testing.T, id, status string, fail bool) {
-	dur := time.Second * 30
+	dur := time.Second * 60
 	tm := time.After(dur)
 	failStr := "not failed"
 	if fail {
@@ -386,7 +386,7 @@ func testEmailReceived(t *testing.T, id, msgType string) {
 
 func testRestoreReceived(t *testing.T, id string) {
 	t.Helper()
-	dur := time.Second * 60
+	dur := time.Second * 90
 	tm := time.After(dur)
 	for {
 		select {

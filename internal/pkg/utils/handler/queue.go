@@ -66,7 +66,7 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 }
 
 func DefaultOpts[TM any]() *Opts[TM] {
-	return &Opts[TM]{timeout: time.Minute * 15, failureHandler: defaultFailureHandler[TM]}
+	return &Opts[TM]{timeout: time.Minute * 15, failureHandler: defaultFailureHandler[TM], backoff: DefaultBackoff()}
 }
 
 func DefaultBackoff() gue.Backoff {

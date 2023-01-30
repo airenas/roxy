@@ -28,7 +28,7 @@ services:
       - WORKER_COUNT=1
       - WORKER_TESTING=true
       - WORKER_CHECKREGISTRY=5s
-      - WORKER_RETRYDELAY=5s
+      - WORKER_RETRYDELAY=3s
       - FILER_URL=minio:9000
       - FILER_KEY=${MINIO_PASS}
       - DB_URL=postgres://roxy:${PSQL_PASS}@db:5432/asr?sslmode=disable
