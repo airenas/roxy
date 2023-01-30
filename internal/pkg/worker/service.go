@@ -188,7 +188,7 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 			goapp.Log.Info().Str("ID", m.ID).Msg("already to late")
 			return fmt.Errorf("no available transcriber in %s, added %s", maxWaitTime.String(), req.Created.Format(time.RFC3339))
 		}
-		// sleep 1 min
+		// sleep for data.RetryDelay
 		err := data.MsgSender.SendMessage(ctx, m, messages.DefaultOpts(messages.Upload).Delay(data.RetryDelay))
 		if err != nil {
 			return fmt.Errorf("can't send msg: %w", err)
@@ -244,15 +244,24 @@ func handleASR(ctx context.Context, m *messages.ASRMessage, data *ServiceData) e
 	return nil
 }
 
-func asrFailureHandler(data *ServiceData) func(context.Context, *messages.ASRMessage, error) error {
-	return func(ctx context.Context, m *messages.ASRMessage, err error) error {
+func asrFailureHandler(data *ServiceData) func(context.Context, *messages.ASRMessage, error, *gue.Job) (bool, time.Duration, error) {
+	return func(ctx context.Context, m *messages.ASRMessage, err error, j *gue.Job) (bool, time.Duration, error) {
+		delay := time.Duration(0)
+		tErr := &errTranscriber{}
+		if errors.As(err, &tErr) {
+			goapp.Log.Info().Str("ID", m.ID).Msg("got transcriber error")
+			delay = data.RetryDelay
+		}
+		if j.ErrorCount < 5 {
+			return true, delay, nil
+		}
 		if _err := sendStatusChangeFailure(ctx, data.MsgSender, m.ID, err.Error()); _err != nil {
 			goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send status failure msg")
 		}
 		if _err := sendFailure(ctx, data.MsgSender, m.ID); _err != nil {
 			goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send failure msg")
 		}
-		return nil
+		return false, 0, nil
 	}
 }
 
@@ -268,15 +277,23 @@ func (e *errTranscriber) Unwrap() error {
 	return e.err
 }
 
-func statusFailureHandler(data *ServiceData) func(context.Context, *messages.StatusMessage, error) error {
-	return func(ctx context.Context, m *messages.StatusMessage, err error) error {
+func statusFailureHandler(data *ServiceData) func(context.Context, *messages.StatusMessage, error, *gue.Job) (bool, time.Duration, error) {
+	return func(ctx context.Context, m *messages.StatusMessage, err error, j *gue.Job) (bool, time.Duration, error) {
+		delay := time.Duration(0)
 		tErr := &errTranscriber{}
+		if errors.As(err, &tErr) {
+			goapp.Log.Info().Str("ID", m.ID).Msg("got transcriber error")
+			delay = data.RetryDelay
+		}
+		if j.ErrorCount < 5 {
+			return true, delay, nil
+		}
 		if errors.As(err, &tErr) {
 			goapp.Log.Info().Str("ID", m.ID).Msg("retry transcription - transcriber result retrieve error")
 			err := data.MsgSender.SendMessage(ctx, &messages.ASRMessage{
-				QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.Upload))
+				QueueMessage: amessages.QueueMessage{ID: m.ID}}, messages.DefaultOpts(messages.Upload).Delay(data.RetryDelay))
 			if err != nil {
-				return fmt.Errorf("can't send msg: %w", err)
+				return true, data.RetryDelay, fmt.Errorf("can't send msg: %w", err)
 			}
 		} else {
 			if _err := sendStatusChangeFailure(ctx, data.MsgSender, m.ID, err.Error()); _err != nil {
@@ -286,7 +303,7 @@ func statusFailureHandler(data *ServiceData) func(context.Context, *messages.Sta
 				goapp.Log.Error().Err(_err).Str("ID", m.ID).Msg("fail send failure msg")
 			}
 		}
-		return nil
+		return false, 0, nil
 	}
 }
 
@@ -484,7 +501,7 @@ func waitStatus(ctx context.Context, wd *persistence.WorkData, data *ServiceData
 	manualCheck := time.Second * 20
 	stCh, cf, err := transcriber.HookToStatus(ctx, wd.ExternalID)
 	if err != nil {
-		return fmt.Errorf("can't hook to status: %w", err)
+		return &errTranscriber{err: fmt.Errorf("can't hook to status: %w", err)}
 	}
 	defer cf()
 	for {
@@ -568,7 +585,7 @@ func upload(ctx context.Context, req *persistence.ReqData, transcriber tapi.Tran
 	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
 	extID, err := transcriber.Upload(ctx, &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap})
 	if err != nil {
-		return "", fmt.Errorf("can't upload: %w", err)
+		return "", &errTranscriber{err: fmt.Errorf("can't upload: %w", err)}
 	}
 	return extID, nil
 }

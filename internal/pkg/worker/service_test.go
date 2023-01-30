@@ -40,7 +40,7 @@ func initTest(t *testing.T) {
 	transcriberPrMock = &mocks.TranscriberProvider{}
 	uRestorerMock = &mockUsageRestorer{}
 	srvData = &ServiceData{DB: dbMock, GueClient: &gue.Client{}, WorkerCount: 10, MsgSender: senderMock,
-		Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock}
+		Filer: filerMock, TranscriberPr: transcriberPrMock, UsageRestorer: uRestorerMock, RetryDelay: time.Second}
 	transcriberMock.On("Clean", mock.Anything, mock.Anything).Return(nil)
 	uRestorerMock.On("Do", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	transcriberPrMock.On("Get", mock.Anything, mock.Anything).Return(transcriberMock, "http://srv:8080", nil)
@@ -300,23 +300,38 @@ func Test_handleStatus_fail_withTranscriberErr(t *testing.T) {
 	assert.ErrorAs(t, err, &terr)
 }
 
+func Test_handleStatusFailure_noretry(t *testing.T) {
+	initTest(t)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	retry, delay, err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, &errTranscriber{err: fmt.Errorf("olia")}, &gue.Job{ErrorCount: 5})
+	assert.Nil(t, err)
+	assert.False(t, retry)
+	assert.Equal(t, time.Duration(0), delay)
+	require.Equal(t, 1, len(senderMock.Calls))
+	require.Equal(t, messages.DefaultOpts(messages.Upload).Delay(time.Second), senderMock.Calls[0].Arguments[2])
+	require.Equal(t, &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, senderMock.Calls[0].Arguments[1])
+}
+
 func Test_handleStatusFailure_retry(t *testing.T) {
 	initTest(t)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
-		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, &errTranscriber{err: fmt.Errorf("olia")})
+	retry, delay, err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, &errTranscriber{err: fmt.Errorf("olia")}, &gue.Job{ErrorCount: 3})
 	assert.Nil(t, err)
-	require.Equal(t, 1, len(senderMock.Calls))
-	require.Equal(t, messages.DefaultOpts(messages.Upload), senderMock.Calls[0].Arguments[2])
-	require.Equal(t, &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, senderMock.Calls[0].Arguments[1])
+	assert.True(t, retry)
+	assert.Equal(t, time.Second, delay)
+	require.Equal(t, 0, len(senderMock.Calls))
 }
 
 func Test_handleStatusFailure_other_err(t *testing.T) {
 	initTest(t)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
-		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, fmt.Errorf("olia"))
+	retry, delay, err := statusFailureHandler(srvData)(test.Ctx(t), &messages.StatusMessage{QueueMessage: amessages.QueueMessage{ID: "1"}, ExternalID: "2",
+		Status: "Start", Progress: 40, Transcriber: "olia", AudioReady: true}, fmt.Errorf("olia"), &gue.Job{ErrorCount: 5})
 	assert.Nil(t, err)
+	assert.False(t, retry)
+	assert.Equal(t, time.Duration(0), delay)
 	require.Equal(t, 2, len(senderMock.Calls))
 	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkFail), senderMock.Calls[0].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[1].Arguments[2])
@@ -325,11 +340,24 @@ func Test_handleStatusFailure_other_err(t *testing.T) {
 func Test_handleAsrFailure(t *testing.T) {
 	initTest(t)
 	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	err := asrFailureHandler(srvData)(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, fmt.Errorf("olia"))
+	retry, delay, err := asrFailureHandler(srvData)(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, fmt.Errorf("olia"), &gue.Job{ErrorCount: 5})
 	assert.Nil(t, err)
+	assert.False(t, retry)
+	assert.Equal(t, time.Duration(0), delay)
 	require.Equal(t, 2, len(senderMock.Calls))
 	require.Equal(t, messages.DefaultOpts(wrkOtherQueuePrefix+":"+wrkFail), senderMock.Calls[0].Arguments[2])
 	require.Equal(t, messages.DefaultOpts(messages.Inform), senderMock.Calls[1].Arguments[2])
+}
+
+func Test_handleAsrFailure_transcriberError(t *testing.T) {
+	initTest(t)
+	senderMock.On("SendMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	retry, delay, err := asrFailureHandler(srvData)(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, fmt.Errorf("olia: %wv", &errTranscriber{err: fmt.Errorf("olia")}),
+		&gue.Job{ErrorCount: 3})
+	assert.Nil(t, err)
+	assert.True(t, retry)
+	assert.Equal(t, time.Second, delay)
+	require.Equal(t, 0, len(senderMock.Calls))
 }
 
 func Test_validate(t *testing.T) {

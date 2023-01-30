@@ -18,10 +18,9 @@ type MsgSender interface {
 }
 
 type Opts[TM any] struct {
-	retryCount     int32
 	backoff        gue.Backoff
 	timeout        time.Duration
-	failureHandler func(context.Context, *TM, error) error
+	failureHandler func(context.Context, *TM, error, *gue.Job) (bool, time.Duration, error)
 }
 
 // CreateHandler helper func to wrapp gue worker main func
@@ -47,26 +46,27 @@ func Create[TM any, SD any](data *SD, hf func(context.Context, *TM, *SD) error, 
 		if err == nil {
 			return nil
 		}
-
-		// process error
-		if j.ErrorCount > opts.retryCount {
-			if opts.failureHandler != nil {
-				if _err := opts.failureHandler(ctx, &m, err); _err != nil {
-					goapp.Log.Error().Err(_err).Str("queue", j.Queue).Str("type", j.Type).Msg("fail execute failure handler")
-				}
-			} else {
-				goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Msg("skip failure handler")
+		retry, delay, errHandler := opts.failureHandler(ctx, &m, err, j)
+		if errHandler != nil {
+			goapp.Log.Error().Err(err).Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Send()
+			if j.ErrorCount > 5 {
+				return nil
 			}
+		}
+		if !retry {
+			goapp.Log.Warn().Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("skip failure handler")
 			return nil
 		}
-		delay := opts.backoff(int(j.ErrorCount + 1))
+		if delay == 0 {
+			delay = opts.backoff(int(j.ErrorCount + 1))
+		}
 		goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Dur("after", delay).Msg("retry after")
 		return gue.ErrRescheduleJobIn(delay, err.Error())
 	}
 }
 
 func DefaultOpts[TM any]() *Opts[TM] {
-	return &Opts[TM]{retryCount: 3, backoff: DefaultBackoff(), timeout: time.Minute * 15}
+	return &Opts[TM]{timeout: time.Minute * 15, failureHandler: defaultFailureHandler[TM]}
 }
 
 func DefaultBackoff() gue.Backoff {
@@ -88,7 +88,7 @@ func DefaultBackoffOrTest(test bool) gue.Backoff {
 	return DefaultBackoff()
 }
 
-func (o *Opts[TM]) WithFailure(failureHandler func(context.Context, *TM, error) error) *Opts[TM] {
+func (o *Opts[TM]) WithFailure(failureHandler func(context.Context, *TM, error, *gue.Job) (bool, time.Duration, error)) *Opts[TM] {
 	o.failureHandler = failureHandler
 	return o
 }
@@ -110,4 +110,12 @@ func fullJitter(t time.Duration) time.Duration {
 	// it is not recommended to use rand in favor of crypto/rand, but here `rand` is ok
 	rand.Seed(time.Now().UnixMicro())
 	return time.Duration(float64(t) * rand.Float64())
+}
+
+func defaultFailureHandler[TM any](ctx context.Context, message *TM, err error, j *gue.Job) (bool, time.Duration, error) {
+	if j.ErrorCount > 3 {
+		goapp.Log.Info().Str("queue", j.Queue).Str("type", j.Type).Int32("errCount", j.ErrorCount).Msg("skip failure handler")
+		return false, 0, nil
+	}
+	return true, 0, nil
 }
