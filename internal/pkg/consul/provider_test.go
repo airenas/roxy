@@ -148,7 +148,8 @@ func TestProvider_updateSrv_drops(t *testing.T) {
 			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}}})
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(p.trans))
-	c1, c2 := p.trans[0].srv, p.trans[2].srv
+
+	gt := index(p.trans, "srv:80") > index(p.trans, "srv:82")
 	err = p.updateSrv([]*api.ServiceEntry{
 		{Service: &api.AgentService{Service: "olia", Port: 82, Address: "srv",
 			Meta: map[string]string{uploadKey: "up", statusKey: "st", resultKey: "res", cleanKey: "cl"}}},
@@ -157,8 +158,16 @@ func TestProvider_updateSrv_drops(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(p.trans))
-	assert.Equal(t, c1, p.trans[0].srv)
-	assert.Equal(t, c2, p.trans[1].srv)
+	assert.Equal(t, gt, index(p.trans, "srv:80") > index(p.trans, "srv:82"))
+}
+
+func index(trWrap []*trWrap, s string) int {
+	for i, tr := range trWrap {
+		if tr.srv == s {
+			return i
+		}
+	}
+	return -1
 }
 
 func Test_getUrl(t *testing.T) {
