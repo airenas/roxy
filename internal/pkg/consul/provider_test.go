@@ -2,7 +2,9 @@ package consul
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
@@ -63,18 +65,58 @@ func Test_Get_by_name(t *testing.T) {
 	testAssertEqPtr(t, tr1, rtr)
 }
 
-func Test_Get_round_robin(t *testing.T) {
+func Test_Get_by_priority(t *testing.T) {
+	rand.Seed(time.Now().Unix())
 	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	tr1 := &mocks.Transcriber{}
-	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia"})
-	p.trans = append(p.trans, &trWrap{real: tr1, srv: "olia1"})
-	for i := 0; i < 10; i++ {
+	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia", priority: 8})
+	p.trans = append(p.trans, &trWrap{real: tr1, srv: "olia1", priority: 2})
+	counts := map[tapi.Transcriber]int{}
+	for i := 0; i < 1000; i++ {
 		rtr, _, _ := p.Get("", true)
-		testAssertEqPtr(t, tr1, rtr)
-		rtr, _, _ = p.Get("", true)
-		testAssertEqPtr(t, tr, rtr)
+		counts[rtr] = counts[rtr] + 1
 	}
+	assert.GreaterOrEqual(t, counts[tr], 700)
+	assert.GreaterOrEqual(t, counts[tr1], 100)
+	assert.LessOrEqual(t, counts[tr], 900)
+	assert.LessOrEqual(t, counts[tr1], 300)
+}
+
+func Test_Get_by_priority2(t *testing.T) {
+	rand.Seed(time.Now().Unix())
+	p := newProvider(nil, "")
+	tr := &mocks.Transcriber{}
+	tr1 := &mocks.Transcriber{}
+	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia", priority: 9.5})
+	p.trans = append(p.trans, &trWrap{real: tr1, srv: "olia1", priority: 0.5})
+	counts := map[tapi.Transcriber]int{}
+	for i := 0; i < 1000; i++ {
+		rtr, _, _ := p.Get("", true)
+		counts[rtr] = counts[rtr] + 1
+	}
+	assert.GreaterOrEqual(t, counts[tr], 920)
+	assert.GreaterOrEqual(t, counts[tr1], 20)
+	assert.LessOrEqual(t, counts[tr], 980)
+	assert.LessOrEqual(t, counts[tr1], 70)
+}
+
+func Test_Get_by_priority_empty(t *testing.T) {
+	rand.Seed(time.Now().Unix())
+	p := newProvider(nil, "")
+	rtr, _, err := p.Get("", true)
+	assert.Nil(t, err)
+	assert.Nil(t, rtr)
+}
+
+func Test_Get_by_priority_one(t *testing.T) {
+	rand.Seed(time.Now().Unix())
+	p := newProvider(nil, "")
+	tr := &mocks.Transcriber{}
+	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia", priority: 9.5})
+	rtr, _, err := p.Get("", true)
+	assert.Nil(t, err)
+	assert.NotNil(t, rtr)
 }
 
 func testAssertEqPtr(t *testing.T, tr, exp tapi.Transcriber) {
@@ -182,13 +224,73 @@ func Test_getUrl(t *testing.T) {
 	}{
 		{name: "http", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr"}}}, key: "uploadURL"},
 			want: "http://srv:81/upload/tr"},
-		{name: "https", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "HTTPSSL":"1"}}}, key: "uploadURL"},
+		{name: "https", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "HTTPSSL": "1"}}}, key: "uploadURL"},
 			want: "https://srv:81/upload/tr"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := getUrl(tt.args.s, tt.args.key); got != tt.want {
 				t.Errorf("getUrl() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getPriority(t *testing.T) {
+	type args struct {
+		s *api.ServiceEntry
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    float64
+		wantErr bool
+	}{
+		{name: "no", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr"}}}},
+			want: 1, wantErr: false},
+		{name: "extract", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "10"}}}},
+			want: 10, wantErr: false},
+		{name: "extract", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "10.5"}}}},
+			want: 10.5, wantErr: false},
+		{name: "fails", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "aa10.5"}}}},
+			want: 0, wantErr: true},
+		{name: "too low", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "0.4"}}}},
+			want: 0, wantErr: true},
+		{name: "too big", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "100.5"}}}},
+			want: 0, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getPriority(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getPriority() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("getPriority() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_fullKey(t *testing.T) {
+	type args struct {
+		s *api.ServiceEntry
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{name: "priority", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr", "priority": "100.5"}}}},
+			want: "uploadURL:upload/tr,priority:100.5,"},
+		{name: "no priority", args: args{s: &api.ServiceEntry{Service: &api.AgentService{Address: "srv", Port: 81, Meta: map[string]string{"uploadURL": "upload/tr"}}}},
+			want: "uploadURL:upload/tr,"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fullKey(tt.args.s); got != tt.want {
+				t.Errorf("fullKey() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,21 +22,22 @@ const (
 	resultKey    = "resultURL"
 	cleanKey     = "cleanURL"
 	isHTTPSSLKey = "HTTPSSL"
+	priorityKey  = "priority"
 )
 
 type Provider struct {
 	consul  *api.Client
 	srvName string
 
-	lock     *sync.RWMutex
-	trans    []*trWrap
-	returned int
+	lock  *sync.RWMutex
+	trans []*trWrap
 }
 
 type trWrap struct {
-	real tapi.Transcriber
-	srv  string
-	key  string
+	real     tapi.Transcriber
+	srv      string
+	key      string
+	priority float64
 }
 
 // NewProvider creates consul service registrator
@@ -66,22 +68,48 @@ func (c *Provider) Get(srv string, allowNew bool) (tapi.Transcriber, string, err
 		}
 		return nil, "", fmt.Errorf("no active srv `%s`", srv)
 	}
+	if len(c.trans) == 0 {
+		return nil, "", nil
+	}
 	// try return same
 	for _, t := range c.trans {
 		if t.srv == srv {
 			return t.real, t.srv, nil
 		}
 	}
-	// else round robin
-	c.returned += 1
-	if c.returned > len(c.trans)-1 {
-		c.returned = 0
+	if len(c.trans) == 1 {
+		t := c.trans[0]
+		return t.real, t.srv, nil
 	}
-	if c.returned < len(c.trans) {
-		t := c.trans[c.returned]
+	// else random select by priority
+	i, err := getRandomByPriority(c.trans)
+	if err != nil {
+		return nil, "", fmt.Errorf("can't select recognizer: %v", err)
+	}
+	if i < len(c.trans) {
+		t := c.trans[i]
 		return t.real, t.srv, nil
 	}
 	return nil, "", nil
+}
+
+func getRandomByPriority(trWraps []*trWrap) (int, error) {
+	prMax := 0.0
+	for _, tr := range trWraps {
+		prMax += tr.priority
+	}
+	if prMax < 0.1 {
+		return 0, fmt.Errorf("wrong priority sum found %f", prMax)
+	}
+	rnd := rand.Float64() * prMax
+	prMax = 0.0
+	for i, tr := range trWraps {
+		prMax += tr.priority
+		if prMax > rnd {
+			return i, nil
+		}
+	}
+	return len(trWraps), nil
 }
 
 func (c *Provider) StartRegistryLoop(ctx context.Context, checkInterval time.Duration) (<-chan struct{}, error) {
@@ -153,7 +181,7 @@ func (c *Provider) updateSrv(srvs []*api.ServiceEntry) error {
 			continue
 		}
 		c.trans = append(c.trans, tr)
-		goapp.Log.Info().Str("service", v).Msg("added transcriber")
+		goapp.Log.Info().Str("service", v).Float64("priority", tr.priority).Msg("added transcriber")
 	}
 	return err
 }
@@ -163,7 +191,26 @@ func newTranscriber(v string, s *api.ServiceEntry) (*trWrap, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't init transcriber for %s: %v", v, err)
 	}
-	res := &trWrap{real: tr, srv: v, key: fullKey(s)}
+	priority, err := getPriority(s)
+	if err != nil {
+		return nil, fmt.Errorf("can't init transcriber for %s: %v", v, err)
+	}
+	res := &trWrap{real: tr, srv: v, key: fullKey(s), priority: priority}
+	return res, nil
+}
+
+func getPriority(s *api.ServiceEntry) (float64, error) {
+	v, ok := s.Service.Meta[priorityKey]
+	if !ok {
+		return 1, nil
+	}
+	res, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("can't parse priority '%s': %v", v, err)
+	}
+	if res < 0.5 || res > 50 {
+		return 0, fmt.Errorf("wrong priority value '%f', not in [0.5, 50]", res)
+	}
 	return res, nil
 }
 
@@ -188,7 +235,7 @@ func key(s *api.ServiceEntry) string {
 
 func fullKey(s *api.ServiceEntry) string {
 	res := strings.Builder{}
-	for _, key := range [...]string{uploadKey, statusKey, resultKey, cleanKey, isHTTPSSLKey} {
+	for _, key := range [...]string{uploadKey, statusKey, resultKey, cleanKey, isHTTPSSLKey, priorityKey} {
 		v, ok := s.Service.Meta[key]
 		if ok {
 			res.WriteString(key + ":" + v + ",")
