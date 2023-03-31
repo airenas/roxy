@@ -27,9 +27,12 @@ func FileExists(name string) bool {
 	return err == nil
 }
 
+var supportedExt = map[string]struct{}{".wav": {}, ".mp3": {}, ".mp4": {}, ".m4a": {}, ".ogg": {}, ".wma": {}, ".webm": {}}
+
 // SupportAudioExt checks if audio ext is supported
 func SupportAudioExt(ext string) bool {
-	return ext == ".wav" || ext == ".mp3" || ext == ".mp4" || ext == ".m4a"
+	_, ok := supportedExt[ext]
+	return ok
 }
 
 // ParamTrue - returns true if string param indicates true value

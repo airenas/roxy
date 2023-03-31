@@ -1,6 +1,8 @@
 package utils
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestMakeValidateFileName(t *testing.T) {
 	type args struct {
@@ -29,6 +31,30 @@ func TestMakeValidateFileName(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("MakeValidateFileName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSupportAudioExt(t *testing.T) {
+	tests := []struct {
+		ext  string
+		want bool
+	}{
+		{ext: ".wav", want: true},
+		{ext: ".mp3", want: true},
+		{ext: ".mp4", want: true},
+		{ext: ".m4a", want: true}, 
+		{ext: ".ogg", want: true},
+		{ext: ".webm", want: true},
+		{ext: ".wma", want: true},
+		{ext: ".zip", want: false},
+		{ext: ".flac", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ext, func(t *testing.T) {
+			if got := SupportAudioExt(tt.ext); got != tt.want {
+				t.Errorf("SupportAudioExt() = %v, want %v", got, tt.want)
 			}
 		})
 	}
