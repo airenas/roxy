@@ -53,7 +53,8 @@ func main() {
 		goapp.Log.Fatal().Err(err).Msg("can't init gue sender")
 	}
 	data.Filer, err = miniofs.NewFiler(ctx, miniofs.Options{Bucket: cfg.GetString("filer.bucket"),
-		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key")})
+		URL: cfg.GetString("filer.url"), User: cfg.GetString("filer.user"), Key: cfg.GetString("filer.key"),
+		Secure: cfg.GetBool("filer.https")})
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init filer")
 	}

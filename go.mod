@@ -3,7 +3,7 @@ module github.com/airenas/roxy
 go 1.19
 
 require (
-	github.com/airenas/async-api v1.3.70
+	github.com/airenas/async-api v1.3.71
 	github.com/airenas/go-app v1.0.25
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
@@ -21,6 +21,7 @@ require (
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/vgarvardt/gue/v5 v5.0.0-20221206121045-9ed09710b7c5
+	go.uber.org/multierr v1.9.0
 )
 
 require (
@@ -86,7 +87,6 @@ require (
 	go.opentelemetry.io/otel/metric v0.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.11.2 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
