@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [worker upload]
+        container: [worker, upload]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
