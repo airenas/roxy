@@ -107,8 +107,6 @@ func (o *Opts[TM]) WithBackoff(b gue.Backoff) *Opts[TM] {
 // as suggested by https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
 func fullJitter(t time.Duration) time.Duration {
 	// `rand` here is used just for backoff jitter,
-	// it is not recommended to use rand in favor of crypto/rand, but here `rand` is ok
-	rand.Seed(time.Now().UnixMicro())
 	return time.Duration(float64(t) * rand.Float64())
 }
 

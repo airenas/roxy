@@ -2,9 +2,7 @@ package consul
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/airenas/roxy/internal/pkg/test/mocks"
 	tapi "github.com/airenas/roxy/internal/pkg/transcriber/api"
@@ -66,7 +64,6 @@ func Test_Get_by_name(t *testing.T) {
 }
 
 func Test_Get_by_priority(t *testing.T) {
-	rand.Seed(time.Now().Unix())
 	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	tr1 := &mocks.Transcriber{}
@@ -84,7 +81,6 @@ func Test_Get_by_priority(t *testing.T) {
 }
 
 func Test_Get_by_priority2(t *testing.T) {
-	rand.Seed(time.Now().Unix())
 	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	tr1 := &mocks.Transcriber{}
@@ -102,7 +98,6 @@ func Test_Get_by_priority2(t *testing.T) {
 }
 
 func Test_Get_by_priority_empty(t *testing.T) {
-	rand.Seed(time.Now().Unix())
 	p := newProvider(nil, "")
 	rtr, _, err := p.Get("", true)
 	assert.Nil(t, err)
@@ -110,7 +105,6 @@ func Test_Get_by_priority_empty(t *testing.T) {
 }
 
 func Test_Get_by_priority_one(t *testing.T) {
-	rand.Seed(time.Now().Unix())
 	p := newProvider(nil, "")
 	tr := &mocks.Transcriber{}
 	p.trans = append(p.trans, &trWrap{real: tr, srv: "olia", priority: 9.5})

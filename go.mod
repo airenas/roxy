@@ -1,6 +1,6 @@
 module github.com/airenas/roxy
 
-go 1.19
+go 1.20
 
 require (
 	github.com/airenas/async-api v1.3.71
