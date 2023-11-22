@@ -88,8 +88,8 @@ func (m *Sender) SendMessage(ctx context.Context, msg amessages.Message, opt *me
 // Transcriber is transcription client mock
 type Transcriber struct{ mock.Mock }
 
-func (m *Transcriber) Upload(ctx context.Context, audio *api.UploadData) (string, error) {
-	args := m.Called(ctx, audio)
+func (m *Transcriber) Upload(ctx context.Context, audioFunc func(context.Context) (*api.UploadData, func(), error)) (string, error) {
+	args := m.Called(ctx, audioFunc)
 	return args.String(0), args.Error(1)
 }
 

@@ -1,7 +1,6 @@
 package transcriber
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -215,34 +214,43 @@ type uploadResponse struct {
 }
 
 // Upload uploads audio to transcriber service
-func (sp *Client) Upload(ctx context.Context, audio *tapi.UploadData) (string, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	i := 0
-	for v, k := range audio.Files {
-		name := getFileParam(i)
-		part, err := writer.CreateFormFile(name, v)
-		if err != nil {
-			return "", fmt.Errorf("can't add file to request: %w", err)
-		}
-		_, err = io.Copy(part, k)
-		if err != nil {
-			return "", fmt.Errorf("can't add file content to request: %w", err)
-		}
-	}
-	for v, k := range audio.Params {
-		if err := writer.WriteField(v, k); err != nil {
-			return "", fmt.Errorf("can't add param: %w", err)
-		}
-	}
-	writer.Close()
-
-	bodyReader := bytes.NewReader(body.Bytes())
-
+func (sp *Client) Upload(ctx context.Context, fileFunc func(context.Context) (*tapi.UploadData, func(), error)) (string, error) {
 	return goapp.InvokeWithBackoff(ctx, func() (string, bool, error) {
+		audio, cf, err := fileFunc(ctx)
+		if err != nil {
+			return "", true, fmt.Errorf("can't get files: %w", err)
+		}
+		defer cf()
+
+		pr, pw := io.Pipe()
+		writer := multipart.NewWriter(pw)
+		go func() {
+			i := 0
+			for v, k := range audio.Files {
+				name := getFileParam(i)
+				part, err := writer.CreateFormFile(name, v)
+				if err != nil {
+					pw.CloseWithError(fmt.Errorf("can't add file to request: %w", err))
+					return
+				}
+
+				if _, err := io.Copy(part, k); err != nil {
+					pw.CloseWithError(fmt.Errorf("can't add file content to request: %w", err))
+					return
+				}
+				i++
+			}
+			for v, k := range audio.Params {
+				if err := writer.WriteField(v, k); err != nil {
+					pw.CloseWithError(fmt.Errorf("can't add param: %w", err))
+					return
+				}
+			}
+			pw.CloseWithError(writer.Close())
+		}()
+
 		var respData uploadResponse
-		_, _ = bodyReader.Seek(0, io.SeekStart)
-		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, bodyReader)
+		req, err := http.NewRequest(http.MethodPost, sp.uploadURL, pr)
 		if err != nil {
 			return "", false, err
 		}

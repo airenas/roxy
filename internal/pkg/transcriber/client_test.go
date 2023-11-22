@@ -2,6 +2,7 @@ package transcriber
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -177,7 +178,7 @@ func TestResult_WrongMediaType(t *testing.T) {
 func TestUpload(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(200, "{\"id\":\"1\"}")})
 
-	r, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "name"}})
+	r, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "name"}}, 0))
 
 	assert.Nil(t, err)
 	assert.Equal(t, r, "1")
@@ -187,7 +188,7 @@ func TestUpload(t *testing.T) {
 func TestUpload_WrongCode_Fails(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/": newTestR(300, "{\"id\":\"1\"}")})
 
-	r, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "name"}})
+	r, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "name"}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, "", r)
@@ -197,7 +198,7 @@ func TestUpload_WrongCode_Fails(t *testing.T) {
 func TestUpload_WrongJSON_Fails(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(300, "olia")})
 
-	r, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "name"}})
+	r, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "name"}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, r, "")
@@ -207,7 +208,7 @@ func TestUpload_WrongJSON_Fails(t *testing.T) {
 func TestUpload_PassParams(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(200, "{\"id\":\"1\"}")})
 
-	r, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "__olia__"}})
+	r, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"}}, 0))
 
 	assert.Nil(t, err)
 	assert.Equal(t, "1", r)
@@ -220,8 +221,8 @@ func TestUpload_PassParams(t *testing.T) {
 func TestUpload_PassFile(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(200, "{\"id\":\"1\"}")})
 
-	r, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "__olia__"},
-		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}})
+	r, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"},
+		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}}, 0))
 
 	assert.Nil(t, err)
 	assert.Equal(t, r, "1")
@@ -235,8 +236,8 @@ func TestUpload_Backoff(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(http.StatusTooManyRequests, "{\"id\":\"1\"}")})
 	client.backoff = newSimpleBackoff
 
-	_, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "__olia__"},
-		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}})
+	_, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"},
+		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 4, len((*tReq)))
@@ -246,8 +247,8 @@ func TestUpload_NoBackoff(t *testing.T) {
 	client, _, tReq := initTestServer(t, map[string]testResp{"/upload": newTestR(http.StatusBadRequest, "{\"id\":\"1\"}")})
 	client.backoff = newSimpleBackoff
 
-	_, err := client.Upload(test.Ctx(t), &api.UploadData{Params: map[string]string{"name": "__olia__"},
-		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}})
+	_, err := client.Upload(test.Ctx(t), newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"},
+		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 1, len((*tReq)))
@@ -260,8 +261,8 @@ func TestUpload_NoBackoff_Deadline(t *testing.T) {
 	ctx, cf := context.WithDeadline(context.Background(), time.Now())
 	defer cf()
 
-	_, err := client.Upload(ctx, &api.UploadData{Params: map[string]string{"name": "__olia__"},
-		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}})
+	_, err := client.Upload(ctx, newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"},
+		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 0, len((*tReq)))
@@ -274,8 +275,8 @@ func TestUpload_NoBackoff_Canceled(t *testing.T) {
 	ctx, cf := context.WithCancel(context.Background())
 	cf()
 
-	_, err := client.Upload(ctx, &api.UploadData{Params: map[string]string{"name": "__olia__"},
-		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}})
+	_, err := client.Upload(ctx, newTestUploadFunc(&api.UploadData{Params: map[string]string{"name": "__olia__"},
+		Files: map[string]io.Reader{"file.wav": strings.NewReader("__file_olia__")}}, 0))
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 0, len((*tReq)))
@@ -330,5 +331,16 @@ func TestNewClient(t *testing.T) {
 				t.Errorf("NewClient() = nil, want object")
 			}
 		})
+	}
+}
+
+func newTestUploadFunc(uploadData *api.UploadData, failCount int) func(context.Context) (*api.UploadData, func(), error) {
+	c := 0
+	return func(context.Context) (*api.UploadData, func(), error) {
+		if failCount > c {
+			return nil, func() {}, fmt.Errorf("fail")
+		}
+		c++
+		return uploadData, func() {}, nil
 	}
 }

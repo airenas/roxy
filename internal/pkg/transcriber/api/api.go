@@ -33,7 +33,7 @@ type FileData struct {
 
 // Transcriber provides transcription
 type Transcriber interface {
-	Upload(ctx context.Context, audio *UploadData) (string, error)
+	Upload(ctx context.Context, audioFunc func(context.Context) (*UploadData, func(), error)) (string, error)
 	HookToStatus(ctx context.Context, ID string) (<-chan StatusData, func(), error)
 	GetStatus(ctx context.Context, ID string) (*StatusData, error)
 	GetAudio(ctx context.Context, ID string) (*FileData, error)

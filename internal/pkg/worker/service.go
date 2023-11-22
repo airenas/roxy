@@ -565,25 +565,29 @@ func processStatus(ctx context.Context, statusData *tapi.StatusData, wd *persist
 }
 
 func upload(ctx context.Context, req *persistence.ReqData, transcriber tapi.Transcriber, data *ServiceData) (string, error) {
-	goapp.Log.Info().Str("ID", req.ID).Msg("load file")
-	filesMap := map[string]io.Reader{}
-	files := []io.ReadCloser{}
-	defer func() {
-		for _, r := range files {
-			_ = r.Close()
+	fileLoadFunc := func(ctxInt context.Context) (*tapi.UploadData, func(), error) {
+		goapp.Log.Info().Str("ID", req.ID).Msg("get files")
+		filesMap := map[string]io.Reader{}
+		files := []io.ReadCloser{}
+		closeFunc := func() {
+			for _, r := range files {
+				_ = r.Close()
+			}
 		}
-	}()
-	for _, f := range req.FileNames {
-		file, err := data.Filer.LoadFile(ctx, utils.MakeFileName(req.ID, f))
-		if err != nil {
-			return "", fmt.Errorf("can't load file: %w", err)
+		for _, f := range req.FileNames {
+			file, err := data.Filer.LoadFile(ctxInt, utils.MakeFileName(req.ID, f))
+			if err != nil {
+				closeFunc()
+				return nil, nil, fmt.Errorf("can't load file: %w", err)
+			}
+			files = append(files, file)
+			filesMap[f] = file
+			goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
 		}
-		files = append(files, file)
-		filesMap[f] = file
-		goapp.Log.Info().Str("ID", req.ID).Msg("loaded")
+		return &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap}, closeFunc, nil
 	}
 	goapp.Log.Info().Str("ID", req.ID).Msg("uploading")
-	extID, err := transcriber.Upload(ctx, &tapi.UploadData{Params: prepareParams(req.Params), Files: filesMap})
+	extID, err := transcriber.Upload(ctx, fileLoadFunc)
 	if err != nil {
 		return "", &errTranscriber{err: fmt.Errorf("can't upload: %w", err)}
 	}

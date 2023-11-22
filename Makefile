@@ -7,10 +7,6 @@ help:
 		awk '{info=$$0; getline; print "  " $$0 ": " info;}' | column -t -s ':' 
 .PHONY: help
 #####################################################################################
-generate:
-	go install github.com/petergtz/pegomock/...@latest
-	go generate ./...
-
 renew-async-api:
 	go get github.com/airenas/async-api@$$(cd ../async-api;git rev-parse HEAD)	
 #####################################################################################
