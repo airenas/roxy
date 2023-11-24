@@ -429,6 +429,9 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
+	if statusRec == nil {  
+		return fmt.Errorf("no status record")
+	}
 	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", statusRec)
 	if statusRec.Error.String != "" {
 		goapp.Log.Info().Str("ID", m.ID).Msg("error set - ignore")
