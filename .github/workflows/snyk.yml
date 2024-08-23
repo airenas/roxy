@@ -25,12 +25,12 @@ jobs:
           image: airenas/roxy-${{ matrix.container }}:latest
           args: --file=build/${{ matrix.container }}/Dockerfile
 
-      - name: Make sarif file copy
-        run: mv snyk.sarif snyk-${{ matrix.container }}.sarif
-
       - name: Replace security-severity undefined for license-related findings 
         run: |
           sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif
+
+      - name: Make sarif file copy
+        run: mv snyk.sarif snyk-${{ matrix.container }}.sarif
 
       - name: Upload snyk ${{ matrix.container }} result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
