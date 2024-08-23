@@ -12,7 +12,7 @@ renew-async-api:
 #####################################################################################
 ## call units tests
 test/unit: 
-	go test -v -race -count=1 ./...
+	go test -race -count=1 ./...
 .PHONY: test/unit
 ## run integration tests
 test/integration: 
