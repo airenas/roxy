@@ -1,7 +1,7 @@
 #########################################################################################
 ## docker will invoke this file from ../.. dir in order to access code
 #########################################################################################
-FROM golang:1.20-alpine as builder
+FROM golang:1.22-alpine AS builder
 
 ARG BUILD_VERSION=0.1
 
@@ -14,14 +14,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build -o /go/bin/worker -trimpath -ldflags "-s -w -X main.version=$BUILD_VERSION" cmd/worker/main.go
 #####################################################################################
-FROM alpine:3.16 as runner
+FROM gcr.io/distroless/static-debian12 AS runner
 
-ENV UID=999
-RUN addgroup app && adduser -S -G app app --uid $UID app
+# ENV UID=999
+# RUN addgroup app && adduser -S -G app app --uid $UID app
 
 WORKDIR /app
-RUN mkdir -p /app && chown -R app:app /app
-RUN mkdir -p /data && chown -R app:app /data   
+# RUN mkdir -p /app && chown -R app:app /app
+# RUN mkdir -p /data && chown -R app:app /data   
 
 ARG BUILD_VERSION=0.1
 
@@ -38,8 +38,8 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 COPY --from=builder /go/bin/worker /app/
 COPY build/worker/config.yaml /app/
 
-RUN chown app:app /app/* /app
+# RUN chown app:app /app/* /app
  
-USER app
+# USER app
 
 ENTRYPOINT ["./worker"]

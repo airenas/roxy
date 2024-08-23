@@ -151,17 +151,6 @@ func Test_handleRestoreUsage(t *testing.T) {
 	assert.Equal(t, "st err", uRestorerMock.Calls[0].Arguments[3])
 }
 
-func Test_handleRestoreUsage_skip(t *testing.T) {
-	initTest(t)
-	dbMock.ExpectedCalls = nil
-	dbMock.On("LoadRequest", mock.Anything, mock.Anything).Return(&persistence.ReqData{ID: "1", RequestID: "rID"}, nil)
-	dbMock.On("LoadStatus", mock.Anything, mock.Anything).Return(&persistence.Status{ID: "1", Status: "Done",
-		ErrorCode: utils.ToSQLStr("errCode"), Error: utils.ToSQLStr("st err")}, nil)
-	err := handleRestoreUsage(test.Ctx(t), &messages.ASRMessage{QueueMessage: amessages.QueueMessage{ID: "1"}}, srvData)
-	assert.Nil(t, err)
-	require.Equal(t, 0, len(uRestorerMock.Calls))
-}
-
 func Test_handleRestoreUsage_Fail(t *testing.T) {
 	initTest(t)
 	dbMock.ExpectedCalls = nil

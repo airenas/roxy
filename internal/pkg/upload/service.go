@@ -320,11 +320,11 @@ func validateExtractFiles(fHeaders []*multipart.FileHeader) ([]string, error) {
 	for _, h := range fHeaders {
 		ext := filepath.Ext(h.Filename)
 		if !utils.SupportAudioExt(strings.ToLower(ext)) {
-			return nil, fmt.Errorf("wrong file extension: " + ext)
+			return nil, fmt.Errorf("wrong file extension: %s", ext)
 		}
 		fn, err := utils.MakeValidateFileName("", h.Filename)
 		if err != nil {
-			return nil, fmt.Errorf("wrong file name: " + h.Filename)
+			return nil, fmt.Errorf("wrong file name: %s", h.Filename)
 		}
 		res = append(res, fn)
 	}
