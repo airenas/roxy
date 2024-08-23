@@ -22,7 +22,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: airenas/roxy-${{ matrix.container }}:latest
+          image: airenas/bt-${{ matrix.container }}:latest
           args: --file=build/${{ matrix.container }}/Dockerfile
 
       - name: Replace security-severity undefined or null findings 
