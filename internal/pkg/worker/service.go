@@ -429,7 +429,7 @@ func handleFailure(ctx context.Context, m *messages.ASRMessage, data *ServiceDat
 	if err != nil {
 		return fmt.Errorf("can't load status: %w", err)
 	}
-	if statusRec == nil {  
+	if statusRec == nil {
 		return fmt.Errorf("no status record")
 	}
 	goapp.Log.Debug().Str("ID", m.ID).Msgf("loaded %v", statusRec)
@@ -468,14 +468,10 @@ func handleRestoreUsage(ctx context.Context, m *messages.ASRMessage, data *Servi
 		return fmt.Errorf("can't load status: %w", err)
 	}
 	goapp.Log.Info().Str("ID", m.ID).Msg("loaded status")
-	if status.ECServiceError.String() == utils.FromSQLStr(st.ErrorCode) {
-		if err := data.UsageRestorer.Do(ctx, req.ID, req.RequestID, utils.FromSQLStr(st.Error)); err != nil {
-			return fmt.Errorf("can't restore: %w", err)
-		}
-		goapp.Log.Info().Str("ID", m.ID).Msg("restore done")
-	} else {
-		goapp.Log.Warn().Str("ID", m.ID).Str("errCode", utils.FromSQLStr(st.ErrorCode)).Msg("restore skip")
+	if err := data.UsageRestorer.Do(ctx, req.ID, req.RequestID, utils.FromSQLStr(st.Error)); err != nil {
+		return fmt.Errorf("can't restore: %w", err)
 	}
+	goapp.Log.Info().Str("ID", m.ID).Msg("restore done")
 	return nil
 }
 
