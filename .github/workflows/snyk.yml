@@ -25,16 +25,10 @@ jobs:
           image: airenas/roxy-${{ matrix.container }}:latest
           args: --file=build/${{ matrix.container }}/Dockerfile
 
-      - name: Show
-        run: cat snyk.sarif
-
-      - name: Replace security-severity undefined for license-related findings 
+      - name: Replace security-severity undefined or null findings 
         run: |
           sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif
           sed -i 's/"security-severity": "null"/"security-severity": "0"/g' snyk.sarif
-
-      - name: Show
-        run: cat snyk.sarif
 
       - name: Make sarif file copy
         run: mv snyk.sarif snyk-${{ matrix.container }}.sarif
