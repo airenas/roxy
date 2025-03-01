@@ -71,7 +71,7 @@ func main() {
 	}
 	data.TranscriberPr = transcribersProvider
 
-	data.UsageRestorer, err = usage.NewRestorer(cfg.GetString("doorman.URL"))
+	data.UsageRestorer, err = usage.NewRestorer(cfg.GetString("doorman.URL"), cfg.GetString("doorman.key"))
 	if err != nil {
 		goapp.Log.Fatal().Err(err).Msg("can't init usage restorer")
 	}
